@@ -1,0 +1,87 @@
+LEYENDA
+=======
+[REUTILIZAR]  Archivo o carpeta equivalente en umi-chunking.
+[EXTRAER]     Funcionalidad que debe separarse de un script actual.
+[ADAPTAR]     Existe una base, pero requiere cambios para el RAG final.
+[NUEVO]       Componente que no existe como tal en el benchmark.
+[REVISAR]     Equivalencia pendiente de confirmar.
+
+
+umi-rag/
+│
+├── src/
+│   └── umi_rag/
+│       │
+│       ├── ingestion/					   
+│       │   ├── pdf_converter.py          # [NUEVO] Conversión PDF → Markdown/JSON
+│       │   ├── document_loader.py        # [NUEVO] Lectura de documentos incorporados
+│       │   ├── preprocessing.py          # [ADAPTAR] Posible reutilización de limpieza/normalización existente
+│       │   └── document_registry.py      # [NUEVO] Registro de documentos, versiones y estados
+│       │
+│       ├── chunking/
+│       │   ├── chunkers/
+│       │   │   ├── base.py               # [REUTILIZAR] chunking/chunkers/base.py
+│       │   │   ├── json/                 # [REUTILIZAR] chunking/chunkers/json/
+│       │   │   └── rulebased/            # [REUTILIZAR] chunking/chunkers/rulebased/
+│       │   ├── chunk_cache.py            # [REUTILIZAR] chunking/chunk_cache.py
+│       │   └── utilities.py              # [REUTILIZAR] chunking/utilities.py
+│       │
+│       ├── indexing/
+│       │   ├── normalizer.py             # [EXTRAER] scripts/run_indexing.py (normalización de chunks)
+│       │   ├── embedder.py               # [EXTRAER] scripts/run_indexing.py (create_embeddings, generación GPU)
+│       │   ├── embedding_cache.py        # [EXTRAER] scripts/run_indexing.py (caché de embeddings)
+│       │   ├── qdrant_store.py           # [EXTRAER] scripts/run_indexing.py (colecciones y upserts)
+│       │   └── pipeline.py               # [ADAPTAR] scripts/run_indexing.py (orquestación de indexación)
+│       │
+│       ├── retrieval/
+│       │   ├── retriever.py              # [EXTRAER] scripts/run_retrieval.py (embeddings de consultas y búsqueda)
+│       │   └── context_builder.py        # [NUEVO] Preparación de contexto para el LLM
+│       │
+│       ├── generation/
+│       │   ├── llm_client.py             # [NUEVO] Cliente del LLM generador
+│       │   ├── prompts.py                # [NUEVO] Prompts para generación de respuestas
+│       │   └── generator.py              # [NUEVO] Generación de respuestas usando contexto recuperado
+│       │
+│       ├── chatbot/
+│       │   ├── service.py                # [NUEVO] Coordinación retrieval + generación
+│       │   ├── conversation.py           # [NUEVO] Gestión del historial conversacional
+│       │   └── citations.py              # [NUEVO] Referencias a documentos y fragmentos originales
+│       │
+│       └── common/
+│           ├── schemas.py                # [NUEVO] Modelos compartidos de documentos, chunks y respuestas
+│           └── settings.py               # [NUEVO] Carga centralizada de configuraciones
+│
+├── app/
+│   ├── api.py                             # [NUEVO] API para consultas e incorporación de documentos
+│   └── ui.py                              # [NUEVO] Interfaz del chatbot
+│
+├── configs/
+│   ├── ingestion_config.json              # [NUEVO] Configuración del procesamiento de PDF
+│   ├── chunker_config.json                # [ADAPTAR] configs/chunker_config.json
+│   ├── tokenizer_config.json              # [REUTILIZAR] configs/tokenizer_config.json
+│   ├── indexing_config.json               # [ADAPTAR] configs/indexing_config.json
+│   ├── retrieval_config.json              # [ADAPTAR] configs/retrieval_config.json
+│   └── generation_config.json             # [NUEVO] Configuración del LLM generador
+│
+├── scripts/
+│   ├── run_ingestion.py                   # [NUEVO] Entrada del pipeline PDF → documentos procesados
+│   │                                      #         Puede reutilizar la ejecución de chunking/run_JSON.py
+│   │                                      #         y chunking/run_MD.py
+│   ├── run_indexing.py                    # [ADAPTAR] scripts/run_indexing.py
+│   │                                      #         Se convierte en lanzador de indexing/pipeline.py
+│   └── run_chatbot.py                     # [NUEVO] Lanzador del chatbot
+│
+├── data/
+│   ├── raw/
+│   │   └── pdf/                           # [NUEVO] Documentos PDF originales
+│   ├── processed/
+│   │   ├── json/                          # [NUEVO] Esperar 
+│   │   └── markdown/                      # [NUEVO] 
+│   └── registry/                          # [NUEVO]
+│
+├── tests/                                 # [NUEVO] 
+├── logs/                                  # [NUEVO] 
+├── pyproject.toml                         # [NUEVO] Empaquetado y dependencias del proyecto
+├── .env.example                           # [NUEVO] Plantilla de variables de entorno
+├── .gitignore                             # [ADAPTAR] .gitignore, si existe en el repositorio original
+└── README.md                              # [ADAPTAR] README.md

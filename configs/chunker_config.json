@@ -1,0 +1,15 @@
+{
+    "paths": {
+        "input_dir": "data/processed/json",
+        "output_dir": "data/processed/chunks"
+    },
+    "execution": {
+        "workers": 1
+    },
+    "tokenizer": {
+        "model_name": "jinaai/jina-embeddings-v2-base-es",
+        "add_special_tokens": true,
+        "max_tokens": 512,
+        "target_tokens": 256
+    }
+}

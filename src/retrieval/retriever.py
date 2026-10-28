@@ -8,9 +8,9 @@ from typing import Any
 
 from qdrant_client import models
 
-from umi_rag.indexing.embedder import create_embedder
-from umi_rag.indexing.pipeline import DEFAULT_CONFIG, embed_query, load_config
-from umi_rag.indexing.qdrant_store import create_client
+from indexing.embedder import create_embedder
+from indexing.pipeline import DEFAULT_CONFIG, embed_query, load_config
+from indexing.qdrant_store import create_client
 
 RETRIEVAL_CONFIG = DEFAULT_CONFIG.parent / "retrieval_config.json"
 

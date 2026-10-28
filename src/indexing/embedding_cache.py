@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from umi_rag.indexing.embedder import iter_embedding_batches
+from indexing.embedder import iter_embedding_batches
 
 
 def _text_hash(text: str) -> str:

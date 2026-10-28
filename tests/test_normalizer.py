@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from umi_rag.indexing.normalizer import iter_normalized_chunks, write_normalized_chunks
+from indexing.normalizer import iter_normalized_chunks, write_normalized_chunks
 
 
 class NormalizerTests(unittest.TestCase):

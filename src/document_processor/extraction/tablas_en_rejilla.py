@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from src.document_processor.config import PDF_CHUNKING_CONVERT_TIMEOUT_SECONDS
+from document_processor.config import PDF_CHUNKING_CONVERT_TIMEOUT_SECONDS
 
 from .chunking_conversion import get_hybrid_url
 from .markdown_cleaner import clean_markdown

@@ -1,4 +1,4 @@
-"""Lanzador CLI para las fases provisionales de indexación."""
+"""Lanzador CLI para normalizar e indexar chunks."""
 
 from __future__ import annotations
 
@@ -7,11 +7,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-# Facilita ejecutar el script desde la carpeta provisional antes de empaquetar
-# el proyecto o instalarlo como paquete.
+# Permite ejecutar el lanzador desde el repositorio sin instalar el paquete.
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from umi_rag.indexing.pipeline import DEFAULT_CONFIG, normalize_only, run_indexing
+from indexing.pipeline import DEFAULT_CONFIG, normalize_only, run_indexing
 
 
 def main() -> None:

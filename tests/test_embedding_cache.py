@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from umi_rag.indexing.embedding_cache import embed_chunks_with_cache
+from indexing.embedding_cache import embed_chunks_with_cache
 
 
 class FakeEmbedder:

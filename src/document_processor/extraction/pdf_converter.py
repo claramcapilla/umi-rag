@@ -7,12 +7,12 @@ multi-columna y filtrado de headers/footers.
 
 Uso básico::
 
-    from src.document_processor.extraction import convert_pdf
+    from document_processor.extraction import convert_pdf
 
     result = convert_pdf("paper.pdf")
 
-`convert_folder` existe en este módulo pero **no se re-exporta** en `extraction/__init__.py`:
-es la vía CLI y no debe usarse desde la app. Ver el docstring de ese `__init__`.
+`convert_folder` existe en este módulo, pero no forma parte de la API pública del
+paquete; es una utilidad para ejecución por lotes.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
-from src.document_processor.config import (
+from document_processor.config import (
     PDF_CONVERT_TIMEOUT_SECONDS,
     PDF_REPAIR_TIMEOUT_SECONDS,
 )

@@ -27,9 +27,9 @@ y no almacena conversaciones.
 
 from typing import Any, Dict, List, Optional
 
-from umi_rag.retrieval.context_builder import build_context
-from umi_rag.generation.prompts import build_messages
-from umi_rag.generation.llm_client import generate_completion
+from retrieval.context_builder import build_context
+from generation.prompts import build_messages
+from generation.llm_client import generate_completion
 
 
 # ============================================================

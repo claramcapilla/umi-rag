@@ -6,7 +6,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from src.document_processor.config import PDF_CHUNKING_CONVERT_TIMEOUT_SECONDS
+from document_processor.config import PDF_CHUNKING_CONVERT_TIMEOUT_SECONDS
 
 from .chunking_markdown import normalize_for_chunking
 from .markdown_cleaner import clean_markdown

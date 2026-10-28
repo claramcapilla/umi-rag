@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from umi_rag.indexing.embedder import (
+from indexing.embedder import (
     create_embedder,
     iter_embedding_batches,
     resolve_worker_config,
@@ -9,7 +9,7 @@ from umi_rag.indexing.embedder import (
 
 
 class EmbedderTests(unittest.TestCase):
-    @patch("umi_rag.indexing.embedder.HuggingFaceEmbeddings")
+    @patch("indexing.embedder.HuggingFaceEmbeddings")
     def test_does_not_enable_remote_code_based_on_model_name(self, embedder_class):
         create_embedder(
             {
@@ -22,7 +22,7 @@ class EmbedderTests(unittest.TestCase):
         kwargs = embedder_class.call_args.kwargs
         self.assertFalse(kwargs["model_kwargs"]["trust_remote_code"])
 
-    @patch("umi_rag.indexing.embedder.HuggingFaceEmbeddings")
+    @patch("indexing.embedder.HuggingFaceEmbeddings")
     def test_remote_code_must_be_enabled_explicitly(self, embedder_class):
         create_embedder(
             {
@@ -47,8 +47,8 @@ class EmbedderTests(unittest.TestCase):
             (3, 2, []),
         )
 
-    @patch("umi_rag.indexing.embedder.torch.cuda.device_count", return_value=2)
-    @patch("umi_rag.indexing.embedder.torch.cuda.is_available", return_value=True)
+    @patch("indexing.embedder.torch.cuda.device_count", return_value=2)
+    @patch("indexing.embedder.torch.cuda.is_available", return_value=True)
     def test_gpu_worker_configuration_uses_configured_ids(
         self, _is_available, _device_count
     ):

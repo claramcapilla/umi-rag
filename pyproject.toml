@@ -10,3 +10,26 @@ dependencies = [
     "opendataloader-pdf>=2.0.0,<3",
     "pikepdf>=9,<10",
 ]
+
+[project.optional-dependencies]
+indexing = [
+    "numpy",
+    "qdrant-client",
+    "langchain-huggingface",
+    "sentence-transformers",
+    "torch",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = [
+    "chatbot*",
+    "document_processor*",
+    "generation*",
+    "indexing*",
+    "retrieval*",
+]

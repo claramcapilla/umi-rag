@@ -6,16 +6,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from umi_rag.indexing.embedder import create_embedder, resolve_worker_config
-from umi_rag.indexing.embedding_cache import embed_chunks_with_cache
-from umi_rag.indexing.normalizer import load_normalized_chunks, write_normalized_chunks
-from umi_rag.indexing.qdrant_store import (
+from indexing.embedder import create_embedder, resolve_worker_config
+from indexing.embedding_cache import embed_chunks_with_cache
+from indexing.normalizer import load_normalized_chunks, write_normalized_chunks
+from indexing.qdrant_store import (
     create_client,
     ensure_collection,
     upsert_chunks,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "indexing_config.json"
 
 

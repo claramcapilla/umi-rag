@@ -4,7 +4,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from src.document_processor.markdown_quality import (
+from document_processor.markdown_quality import (
     CAPTION_HEADING_RE,
     HEADING_RE,
     LIST_ITEM_RE,

@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from umi_rag.indexing.qdrant_store import upsert_chunks
+from indexing.qdrant_store import upsert_chunks
 
 
 class InMemoryQdrant:

@@ -1,1 +1,1 @@
-"""Core components for the provisional umi-rag project."""
+"""Pruebas del proyecto."""

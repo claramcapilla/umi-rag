@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, overload
 
-from src.document_processor.config import HEADING_RE as _HEADING_RE
+from document_processor.config import HEADING_RE as _HEADING_RE
 
 _LIGATURE_MAP = {
     "\ufb00": "ff",

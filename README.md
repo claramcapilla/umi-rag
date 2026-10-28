@@ -1,100 +1,104 @@
-# umi-rag: piezas provisionales de indexación y retrieval
+# umi-rag
 
-Esta carpeta es un área de preparación para trasladar al futuro repositorio
-`umi-rag`. No modifica el benchmark ni depende del código de `chunking/`.
-Elimina la carpeta cuando ya no necesites esta preparación.
+Repositorio en desarrollo para un sistema RAG de documentos clínicos. El código
+Python usa una estructura `src/` directa: los paquetes (`indexing`,
+`retrieval`, `generation`, `chatbot` y `document_processor`) están dentro de
+`src/`.
 
-## Antes de ejecutar
+## Estado actual
 
-1. En `configs/indexing_config.json`, elige el modelo definitivo de embeddings
-   y configura la conexión/colección de Qdrant. El nombre del modelo se deja
-   sin definir intencionadamente; indexación y retrieval leen siempre el mismo
-   valor de esta configuración.
-2. Coloca la salida de chunks bajo `data/processed/chunks/` o cambia
-   `paths.chunks_dir`. Se admiten tanto JSONL canónicos (un chunk por línea)
-   como archivos JSON `chunk_results` producidos por los runners actuales.
-3. Instala las dependencias del proyecto que correspondan (`qdrant-client`,
-   `langchain-huggingface`, `sentence-transformers` y `torch`) en el futuro
-   repositorio y arranca Qdrant.
+- **Indexación:** normaliza chunks JSONL o resultados `chunk_results`, calcula
+  embeddings con caché y hace upsert en Qdrant.
+- **Retrieval:** busca chunks para una pregunta usando el modelo de embeddings
+  configurado. No genera respuestas.
+- **Procesamiento documental:** hay módulos de conversión PDF y limpieza, pero
+  la migración del procesamiento y del chunking aún está incompleta.
+- **Generación y chatbot:** existen componentes en `src/generation/` y
+  `src/chatbot/`; todavía no están conectados a la aplicación web.
+- **Web:** `web/` contiene un prototipo Django separado. Su vista aún importa
+  `rag.service`, que no está en este repositorio; por tanto, la web no está
+  conectada al pipeline actual.
 
-Desde la raíz de esta carpeta:
+## Requisitos e instalación
+
+El proyecto declara Python `>=3.12,<3.13` en `pyproject.toml`.
+
+Desde la raíz del repositorio, en PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[indexing]"
+```
+
+La instalación editable registra los paquetes que están en `src/` para que
+puedan importarse directamente como `indexing`, `retrieval`, etc. El extra
+`indexing` instala las dependencias de embeddings y Qdrant; PyTorch puede
+requerir una instalación específica según el hardware y la versión de CUDA.
+
+`pyproject.toml` es el archivo estándar de configuración y metadatos de un
+proyecto Python: aquí declara el nombre, la versión, las dependencias, la
+versión de Python y cómo descubrir los paquetes de `src/`.
+
+## Indexación
+
+Antes de indexar:
+
+1. Configura `embeddings.model_name` y la conexión/colección de Qdrant en
+   `configs/indexing_config.json`.
+2. Coloca chunks en `data/processed/chunks/` o cambia `paths.chunks_dir`.
+   Se admiten JSONL canónicos (un chunk por línea) y archivos JSON
+   `chunk_results`.
+3. Arranca Qdrant.
+
+Ejecuta desde la raíz:
 
 ```powershell
 python scripts\run_indexing.py
 ```
 
-El lanzador llama a `indexing.pipeline`: normaliza los chunks, reutiliza o
-calcula sus embeddings y hace upsert en una única colección. También acepta
-`--normalize-only` para probar la lectura/normalización sin cargar el modelo ni
-conectar a Qdrant. Si la colección ya existe, la conserva (no la borra) y falla
-si su dimensión no coincide con la del modelo.
+Para validar y escribir los chunks normalizados sin cargar el modelo ni
+conectar con Qdrant:
 
-### Añadir documentos después de la primera indexación
+```powershell
+python scripts\run_indexing.py --normalize-only
+```
 
-La indexación está pensada para ser incremental y repetible. Cuando la futura
-ingesta convierta un PDF nuevo a chunks, basta con dejar su salida en
-`paths.chunks_dir` y volver a ejecutar el lanzador; no hay que cambiar la
-configuración ni volver a crear la colección. El pipeline vuelve a leer el
-conjunto de chunks para validar/normalizarlo, pero la caché evita recalcular los
-embeddings existentes y Qdrant solo recibe puntos nuevos o cuyo payload haya
-cambiado. Los IDs deterministas hacen que una reejecución no duplique puntos.
+La indexación es incremental y repetible: los IDs deterministas y la caché
+evitan duplicar puntos o recalcular embeddings que no han cambiado. El pipeline
+no elimina puntos antiguos de Qdrant cuando desaparece un documento o cambian
+sus IDs.
 
-Para que funcione, cada chunk debe mantener el mismo `chunk_id` entre
-ejecuciones. Los formatos canónicos sin ID reciben uno determinista a partir
-de la ruta relativa del archivo y el número de línea; los resultados actuales
-del benchmark conservan una identidad basada en documento, estrategia e
-índice. La carpeta preparada aún no convierte PDFs ni registra versiones:
-esa futura etapa de ingesta tendrá que producir los chunks. El borrado de
-documentos, o la sustitución de un documento cuyo esquema de IDs haya cambiado,
-no se sincroniza automáticamente con Qdrant; se resolverá con el futuro
-registro de documentos y una política explícita de actualización/eliminación.
-
-## Qué hace cada pieza
-
-- `indexing.normalizer`: acepta JSONL canónico o los archivos
-  `chunk_results` del benchmark y los convierte a una representación común.
-  No decide cómo se crean los chunks.
-- `indexing.embedder`: carga el modelo configurado, aplica prefijos opcionales
-  y calcula los vectores por lotes.
-- `indexing.embedding_cache`: guarda los vectores por modelo, ID y hash del
-  texto, y recalcula solo lo que falta o ha cambiado.
-- `indexing.qdrant_store`: conecta con Qdrant, crea la colección si no existe y
-  actualiza los puntos con IDs deterministas. No elimina colecciones.
-- `indexing.pipeline`: ejecuta estas fases en orden.
-- `retrieval.retriever`: recibe una pregunta individual, la vectoriza con el
-  mismo modelo y busca los chunks más similares. Devuelve texto y metadatos;
-  no crea el prompt, no llama a un LLM y no redacta la respuesta.
-
-El retrieval de este RAG no necesita un archivo de preguntas: el servicio del
-chatbot le pasará el texto de cada turno directamente. Se puede reutilizar el
-modelo y la conexión para una conversación:
+El retrieval toma su límite de resultados de `configs/retrieval_config.json`.
+También se puede usar desde Python:
 
 ```python
-from umi_rag.retrieval.retriever import Retriever
+from retrieval.retriever import Retriever
 
 with Retriever() as retriever:
     hits = retriever.retrieve("¿Cuál es la recomendación?", top_k=5)
 ```
 
-Se conservan `num_workers`, `cpu_threads`, `num_gpus` y `gpu_ids`, con valores
-por defecto seguros en `configs/indexing_config.json`. En CPU, `num_workers`
-controla los procesos y `cpu_threads` limita los hilos de cada uno. Si se
-configura `num_gpus` mayor que cero, cada GPU seleccionada recibe un worker;
-`gpu_ids` es opcional y, si se omite, se usan los índices consecutivos desde
-cero. La disponibilidad y los índices CUDA se validan antes de indexar. En
-modo multiproceso, el modelo se carga en CPU y Sentence Transformers lo
-distribuye a los workers. `embedding_batch_size` regula el trabajo de cada
-lote y `cache_batch_size` cada punto de control de la caché. Para el modo
-simple se puede dejar un worker, cero GPUs y `embeddings.device` en `cpu`.
+## Pruebas
 
-`embeddings.trust_remote_code` está desactivado por defecto. Algunos modelos
-pueden pedirlo para cargar código adicional publicado por sus autores; solo se
-debe activar tras revisar y confiar en ese código. No se activa por el nombre
-de un proveedor.
+Con el entorno virtual y el proyecto instalados:
 
-Para importar el paquete antes de empaquetar el proyecto, añade `src` a
-`PYTHONPATH` o instala el paquete al crear el `pyproject.toml` del repositorio
-definitivo.
+```powershell
+python -m unittest discover -s tests -v
+```
 
-El formato de chunking, el conversor PDF, la API y la generación del chatbot
-siguen fuera de este alcance.
+## Estructura principal
+
+```text
+configs/       Configuración de indexación y retrieval
+data/          Datos de ejemplo y datos de trabajo
+scripts/       Lanzadores de tareas
+src/
+  chatbot/     Componentes de conversación y citas
+  document_processor/
+  generation/  Prompts y cliente/generador LLM
+  indexing/    Normalización, embeddings, caché y Qdrant
+  retrieval/   Búsqueda y construcción de contexto
+tests/         Pruebas unitarias
+web/           Prototipo Django aún no integrado con el pipeline
+```

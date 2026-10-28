@@ -1,0 +1,4 @@
+django>=5.0,<6
+gunicorn>=22
+requests>=2.31
+whitenoise>=6.6

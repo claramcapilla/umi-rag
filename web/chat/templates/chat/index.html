@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asistente clínico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --slate: #0e1116;   /* fondo */
+      --well: #161b21;    /* barra superior, zona de escritura y respuestas */
+      --bubble: #202731;  /* preguntas */
+      --line: #262d37;
+      --text: #dde4ec;
+      --muted: #8c99a8;
+      --teal: #74bdb0;    /* unico acento: texto del modelo, accion principal, foco */
+      --danger: #e8958c;
+      --font: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --measure: 42rem;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; height: 100vh; display: flex; flex-direction: column;
+      background: var(--slate); color: var(--text);
+      font: 400 17px/1.6 var(--font);
+    }
+    button, textarea { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+    .column { width: 100%; max-width: var(--measure); margin: 0 auto; }
+
+    /* Barra superior */
+    .bar { background: var(--well); border-bottom: 1px solid var(--line); padding: 0 16px; }
+    .bar .column { display: flex; align-items: baseline; gap: 12px; min-height: 52px; padding-top: 14px; }
+    .bar h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: .005em; }
+    .bar .model { color: var(--muted); font-size: 14px; }
+    .bar .actions { margin-left: auto; display: flex; gap: 4px; }
+    .quiet {
+      background: none; border: 0; padding: 2px 8px; border-radius: 4px;
+      color: var(--muted); font-size: 15px; cursor: pointer;
+    }
+    .quiet:hover { color: var(--text); }
+    .bar form { margin: 0; }
+
+    /* Hilo de consultas */
+    main { flex: 1; overflow-y: auto; padding: 8px 16px 32px; }
+    /* Pregunta a la derecha, respuesta a la izquierda; el borde verde marca el texto del modelo */
+    .turn { display: flex; flex-direction: column; gap: 12px; padding: 14px 0; }
+    .q, .a { margin: 0; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .q {
+      align-self: flex-end; max-width: 80%;
+      background: var(--bubble); border-radius: 14px 14px 4px 14px;
+    }
+    .a {
+      align-self: flex-start; max-width: 88%; min-height: 2.8em;
+      background: var(--well); border: 1px solid var(--line); border-left: 2px solid var(--teal);
+      border-radius: 4px 14px 14px 14px;
+    }
+    .a.pending { min-width: 72px; border-left-color: var(--line); animation: reading 1.4s ease-in-out infinite; }
+    .a.error { border-left-color: var(--danger); color: var(--danger); }
+    @keyframes reading { 50% { border-left-color: var(--teal); } }
+
+    /* Zona de escritura */
+    footer { background: var(--well); border-top: 1px solid var(--line); padding: 14px 16px 12px; }
+    .composer { display: flex; gap: 10px; align-items: flex-end; }
+    textarea {
+      flex: 1; resize: none; min-height: 46px; max-height: 220px; padding: 10px 12px;
+      background: var(--slate); border: 1px solid var(--line); border-radius: 6px; line-height: 1.5;
+    }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus-visible { outline: none; border-color: var(--teal); }
+    #send {
+      height: 46px; padding: 0 20px; border: 0; border-radius: 6px; cursor: pointer;
+      background: var(--teal); color: #10201d; font-weight: 600;
+    }
+    #send:disabled { opacity: .45; cursor: default; }
+    .fineprint { display: flex; gap: 16px; margin-top: 8px; font-size: 14px; color: var(--muted); }
+    .fineprint .keys { margin-left: auto; white-space: nowrap; }
+
+    @media (max-width: 560px) {
+      .bar .model, .fineprint .keys { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .a.pending { animation: none; border-left-style: dashed; border-left-color: var(--teal); }
+    }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <div class="column">
+      <h1>Asistente clínico</h1>
+      <span class="model">{{ model }}</span>
+      <div class="actions">
+        <button class="quiet" id="reset" type="button">Nueva consulta</button>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="quiet" type="submit">Salir</button></form>
+      </div>
+    </div>
+  </header>
+
+  <main id="scroll">
+    <div class="column" id="thread"></div>
+  </main>
+
+  <footer>
+    <div class="column">
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Escribe tu pregunta clínica" aria-label="Pregunta"></textarea>
+        <button id="send" type="button">Enviar</button>
+      </div>
+      <div class="fineprint">
+        <span>Herramienta experimental. No introduzcas datos que identifiquen a pacientes.</span>
+        <span class="keys">Mayús+Enter para nueva línea</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const csrftoken = "{{ csrf_token }}";
+    const apiUrl = "{% url 'chat_api' %}";
+    const thread = document.getElementById("thread");
+    const scroll = document.getElementById("scroll");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+    let history = [];
+    let busy = false;
+
+    function toBottom() { scroll.scrollTop = scroll.scrollHeight; }
+
+    // Cada consulta es un bloque: pregunta (derecha) + respuesta del modelo (izquierda, linea verde)
+    function addTurn(question) {
+      const turn = document.createElement("section");
+      turn.className = "turn";
+      const q = document.createElement("p");
+      q.className = "q";
+      q.textContent = question;   // textContent: nunca se interpreta como HTML
+      const a = document.createElement("p");
+      a.className = "a pending";
+      a.setAttribute("aria-live", "polite");
+      turn.append(q, a);
+      thread.appendChild(turn);
+      toBottom();
+      return a;
+    }
+
+    function autosize() {
+      input.style.height = "";
+      input.style.height = input.scrollHeight + "px";
+    }
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text || busy) return;
+      busy = true; sendBtn.disabled = true;
+      input.value = ""; autosize();
+      history.push({ role: "user", content: text });
+      const answerEl = addTurn(text);
+
+      try {
+        const r = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+          body: JSON.stringify({ messages: history }),
+        });
+        if (r.redirected) { location.reload(); return; }   // la sesion ha caducado
+        if (!r.ok) throw new Error(r.status);
+
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let answer = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          answer += decoder.decode(value, { stream: true });
+          answerEl.classList.remove("pending");
+          answerEl.textContent = answer;
+          toBottom();
+        }
+        history.push({ role: "assistant", content: answer });
+      } catch (e) {
+        answerEl.classList.remove("pending");
+        answerEl.classList.add("error");
+        answerEl.textContent = "No se ha podido obtener la respuesta. Vuelve a enviar la pregunta.";
+        history.pop();   // la pregunta sin respuesta no se reenvia
+      } finally {
+        busy = false; sendBtn.disabled = false; input.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    input.addEventListener("input", autosize);
+
+    document.getElementById("reset").addEventListener("click", () => {
+      if (busy) return;
+      history = [];
+      thread.replaceChildren();
+      input.focus();
+    });
+
+    input.focus();
+  </script>
+</body>
+</html>

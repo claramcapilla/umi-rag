@@ -1,0 +1,30 @@
+{
+  "paths": {
+    "chunks_dir": "data/processed/chunks",
+    "normalized_chunks_file": "data/processed/indexing/normalized_chunks.jsonl",
+    "embedding_cache_dir": "data/processed/indexing/embedding_cache"
+  },
+  "qdrant": {
+    "host": "127.0.0.1",
+    "port": 6333,
+    "collection_name": "umi_rag"
+  },
+  "embeddings": {
+    "model_name": null,
+    "device": "cpu",
+    "normalize_embeddings": true,
+    "trust_remote_code": false,
+    "document_prefix": "",
+    "query_prefix": ""
+  },
+  "indexing": {
+    "batch_size": 32,
+    "embedding_batch_size": 32,
+    "cache_batch_size": 1024,
+    "num_workers": 1,
+    "cpu_threads": 1,
+    "num_gpus": 0,
+    "gpu_ids": [],
+    "use_cache": true
+  }
+}

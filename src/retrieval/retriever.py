@@ -1,290 +1,109 @@
-# ============================================================
-# RETRIEVER DEL CHATBOT
-# ============================================================
+"""Recupera chunks relevantes para una pregunta directa del chatbot."""
 
-"""
-Este módulo se encarga de recuperar de Qdrant los chunks
-más relevantes para una pregunta del usuario.
+from __future__ import annotations
 
-Flujo:
+import json
+from pathlib import Path
+from typing import Any
 
-1. Recibe una pregunta.
-2. Genera su embedding.
-3. Construye el filtro de Qdrant según el tipo de documento
-   y la estrategia de chunking configurada.
-4. Realiza la búsqueda vectorial.
-5. Devuelve los chunks recuperados junto con sus metadatos.
-"""
+from qdrant_client import models
+
+from umi_rag.indexing.embedder import create_embedder
+from umi_rag.indexing.pipeline import DEFAULT_CONFIG, embed_query, load_config
+from umi_rag.indexing.qdrant_store import create_client
+
+RETRIEVAL_CONFIG = DEFAULT_CONFIG.parent / "retrieval_config.json"
 
 
-# ============================================================
-# IMPORTS
-# ============================================================
+class Retriever:
+    """Reusable retrieval client that keeps the model and Qdrant connection open."""
 
-from typing import Any, Dict, List
+    def __init__(
+        self,
+        config_file: Path = DEFAULT_CONFIG,
+        retrieval_config_file: Path = RETRIEVAL_CONFIG,
+    ) -> None:
+        # Cargar el modelo y abrir Qdrant una sola vez permite reutilizar esta
+        # instancia entre varias preguntas de una misma conversación.
+        self.config = load_config(config_file)
+        with retrieval_config_file.open("r", encoding="utf-8") as stream:
+            self.retrieval_config = json.load(stream)
+        embedding_config = self.config["embeddings"]
+        if not embedding_config.get("model_name"):
+            raise ValueError(
+                "Configura embeddings.model_name en indexing_config.json "
+                "antes de recuperar."
+            )
+        self.embedder = create_embedder(embedding_config)
+        self.client = create_client(self.config["qdrant"])
 
-import torch
-
-from langchain_huggingface import HuggingFaceEmbeddings
-from qdrant_client import QdrantClient
-from qdrant_client.http import models
-
-
-# ============================================================
-# CREAR MODELO DE EMBEDDINGS
-# ============================================================
-
-def create_embeddings(
-    embeddings_config: Dict[str, Any],
-) -> HuggingFaceEmbeddings:
-
-    """
-    Carga el modelo de embeddings utilizado para transformar
-    las preguntas del usuario en vectores.
-
-    Debe ser el mismo modelo utilizado para indexar los chunks
-    almacenados en Qdrant.
-    """
-
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
-    )
-
-    print(
-        f"Cargando modelo de embeddings: "
-        f"{embeddings_config['model_name']} "
-        f"en {device}"
-    )
-
-    embeddings = HuggingFaceEmbeddings(
-        model_name=embeddings_config["model_name"],
-        model_kwargs={
-            "device": device,
-        },
-        encode_kwargs={
-            "normalize_embeddings":
-                embeddings_config.get(
-                    "normalize_embeddings",
-                    True,
-                )
-        },
-    )
-
-    return embeddings
-
-
-# ============================================================
-# CONECTAR A QDRANT
-# ============================================================
-
-def connect_to_qdrant(
-    qdrant_config: Dict[str, Any],
-) -> QdrantClient:
-
-    """
-    Crea la conexión con Qdrant.
-    """
-
-    client = QdrantClient(
-        host=qdrant_config["host"],
-        port=qdrant_config["port"],
-        timeout=60,
-    )
-
-    return client
-
-
-# ============================================================
-# CREAR FILTRO DE RETRIEVAL
-# ============================================================
-
-def create_retrieval_filter(
-    strategies: Dict[str, str],
-) -> models.Filter:
-
-    """
-    Construye el filtro que determina qué chunks pueden
-    participar en el retrieval.
-
-    Ejemplo:
-
-        paper
-            -> recursive_chunking
-
-        guideline
-            -> recursive_chunking
-
-        ficha_tecnica
-            -> JSONChunking
-
-    Cada combinación document_type + strategy constituye
-    una condición válida.
-
-    Las distintas combinaciones se unen mediante OR.
-    """
-
-    document_filters = []
-
-    for document_type, strategy in strategies.items():
-
-        document_filter = models.Filter(
-            must=[
-                models.FieldCondition(
-                    key="document_type",
-                    match=models.MatchValue(
-                        value=document_type
-                    ),
-                ),
-                models.FieldCondition(
-                    key="strategy",
-                    match=models.MatchValue(
-                        value=strategy
-                    ),
-                ),
-            ]
+    def retrieve(
+        self,
+        question: str,
+        top_k: int | None = None,
+        filters: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        # Retrieval recibe una pregunta individual; no lee ground truth ni
+        # genera la respuesta final del chatbot.
+        if not question.strip():
+            raise ValueError("La pregunta no puede estar vacía.")
+        limit = (
+            top_k if top_k is not None else int(self.retrieval_config["top_k"])
         )
-
-        document_filters.append(
-            document_filter
-        )
-
-    query_filter = models.Filter(
-        should=document_filters
-    )
-
-    return query_filter
-
-
-# ============================================================
-# FORMATEAR CHUNKS
-# ============================================================
-
-def format_hits(
-    hits,
-) -> List[Dict[str, Any]]:
-
-    """
-    Convierte los resultados devueltos por Qdrant en una
-    estructura sencilla para utilizar posteriormente en
-    el pipeline del RAG.
-
-    Se conserva tanto el texto como los metadatos para poder
-    mostrar las fuentes utilizadas por el chatbot.
-    """
-
-    chunks = []
-
-    for rank, hit in enumerate(
-        hits,
-        start=1,
-    ):
-
-        payload = hit.payload or {}
-
-        metadata = payload.get(
-            "metadata",
-            {},
-        )
-
-        chunks.append(
+        if limit < 1:
+            raise ValueError("top_k debe ser al menos 1.")
+        embedding_config = self.config["embeddings"]
+        # La consulta se vectoriza con el mismo modelo/prefijo que se configuró
+        # para la indexación de documentos.
+        vector = embed_query(question, self.embedder, embedding_config)
+        conditions = [
+            models.FieldCondition(key=key, match=models.MatchValue(value=value))
+            for key, value in (filters or {}).items()
+        ]
+        # Los filtros son opcionales y se aplican al payload de Qdrant antes
+        # de devolver los vecinos más cercanos.
+        points = self.client.query_points(
+            collection_name=self.config["qdrant"]["collection_name"],
+            query=vector,
+            query_filter=models.Filter(must=conditions) if conditions else None,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        ).points
+        # Devolver el texto y las referencias permite que una futura capa de
+        # contexto/citas los prepare para el LLM generador.
+        return [
             {
                 "rank": rank,
-                "score": hit.score,
-
-                "chunk_id": payload.get(
-                    "original_chunk_id"
-                ),
-
-                "document_id": payload.get(
-                    "document_id"
-                ),
-
-                "document_type": payload.get(
-                    "document_type"
-                ),
-
-                "strategy": payload.get(
-                    "strategy"
-                ),
-
-                "chunk_index": payload.get(
-                    "chunk_index"
-                ),
-
-                "group_name": metadata.get(
-                    "group_name"
-                ),
-
-                "text": payload.get(
-                    "text"
-                ),
+                "score": point.score,
+                "chunk_id": (point.payload or {}).get("chunk_id"),
+                "document_id": (point.payload or {}).get("document_id"),
+                "document_type": (point.payload or {}).get("document_type"),
+                "source_file": (point.payload or {}).get("source_file"),
+                "text": (point.payload or {}).get("text"),
+                "metadata": (point.payload or {}).get("metadata", {}),
             }
-        )
+            for rank, point in enumerate(points, start=1)
+        ]
 
-    return chunks
+    def close(self) -> None:
+        # Cerrar el cliente al terminar libera los recursos de red.
+        self.client.close()
+
+    def __enter__(self) -> Retriever:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
 
-# ============================================================
-# RECUPERAR CHUNKS
-# ============================================================
-
-def retrieve_chunks(
+def retrieve(
     question: str,
-    embeddings: HuggingFaceEmbeddings,
-    client: QdrantClient,
-    collection_name: str,
-    top_k: int,
-    strategies: Dict[str, str],
-) -> List[Dict[str, Any]]:
-
-    """
-    Recupera los chunks más relevantes para una pregunta.
-
-    La búsqueda se realiza únicamente entre los chunks que
-    cumplen las combinaciones document_type + strategy
-    especificadas en la configuración.
-    """
-
-    # --------------------------------------------------------
-    # 1. Generar embedding de la pregunta
-    # --------------------------------------------------------
-
-    query_vector = embeddings.embed_query(
-        question
-    )
-
-
-    # --------------------------------------------------------
-    # 2. Construir filtro
-    # --------------------------------------------------------
-
-    query_filter = create_retrieval_filter(
-        strategies
-    )
-
-
-    # --------------------------------------------------------
-    # 3. Buscar en Qdrant
-    # --------------------------------------------------------
-
-    search_result = client.query_points(
-        collection_name=collection_name,
-        query=query_vector,
-        query_filter=query_filter,
-        limit=top_k,
-        with_payload=True,
-        with_vectors=False,
-    ).points
-
-
-    # --------------------------------------------------------
-    # 4. Formatear resultados
-    # --------------------------------------------------------
-
-    chunks = format_hits(
-        search_result
-    )
-
-    return chunks
+    top_k: int | None = None,
+    config_file: Path = DEFAULT_CONFIG,
+    retrieval_config_file: Path = RETRIEVAL_CONFIG,
+    filters: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Ayudante para una consulta; para el chatbot reutilizar Retriever."""
+    with Retriever(config_file, retrieval_config_file) as retriever:
+        return retriever.retrieve(question, top_k=top_k, filters=filters)

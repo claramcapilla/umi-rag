@@ -1,0 +1,12 @@
+
+[project]
+name = "umi-rag"
+version = "0.1.0"
+description = "Sistema RAG con procesamiento documental clínico"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "django>=5.0,<6",
+    "opendataloader-pdf>=2.0.0,<3",
+    "pikepdf>=9,<10",
+]

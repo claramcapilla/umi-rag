@@ -75,3 +75,31 @@ MAX_HISTORY_MESSAGES = 20      # mensajes previos que se reenvian al modelo
 MAX_MESSAGE_CHARS = 8000       # longitud maxima de cada mensaje
 MAX_TOKENS = 1024              # longitud maxima de cada respuesta
 TEMPERATURE = 0.3
+
+
+# --- Ollama: generación de JSON clínico (docsrepo) ---
+
+LLM_API_KEY = "ollama"
+
+LLM_BASE_URL = os.environ.get(
+    "LLM_BASE_URL",
+    "http://127.0.0.1:11434/v1"
+)
+
+LLM_ALLOWED_ENDPOINTS = [
+    "http://127.0.0.1:11434/v1"
+]
+
+LLM_JSON_MODEL = os.environ.get(
+    "LLM_JSON_MODEL",
+    "qwen2.5:7b"
+)
+
+LLM_REASONING = ""
+LLM_SERVICE_TIER = ""
+LLM_TOKENS_PARAM = "max_tokens"
+
+LLM_WHOLE_DOCUMENT = False
+LLM_CONTEXT_TOKENS = 0
+LLM_TABLE_GRID = False
+LLM_MAX_PARALLEL_WORKERS = 1

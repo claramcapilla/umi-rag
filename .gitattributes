@@ -1,6 +1,2 @@
-<<<<<<< Updated upstream
 # Auto detect text files and perform LF normalization
-* text=auto eol=lf
-=======
-* text=auto eol=lf
->>>>>>> Stashed changes
+* text=auto eol=lf No newline at end of file

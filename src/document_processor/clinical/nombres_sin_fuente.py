@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from src.document_processor.schema import ClinicalJson, DocVariant
+from document_processor.schema import ClinicalJson, DocVariant
 
 _PALABRA_RE = re.compile(r"[a-z0-9]+")
 _POSESIVO_RE = re.compile(r"['’]s\b")

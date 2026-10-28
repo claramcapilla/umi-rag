@@ -11,6 +11,7 @@ PROJECT_ROOT = WEB_DIR.parent
 
 # Permite importar módulos
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.append(str(PROJECT_ROOT / "src"))
 
 if __name__ == "__main__":
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "chatbot.settings")

@@ -38,9 +38,9 @@ from django.utils import timezone
 from openai import OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
-from src.document_processor import consumo
-from src.document_processor.chunking import SCHEMA_VERSION
-from src.document_processor.clinical import (
+from document_processor import consumo
+from document_processor.chunking import SCHEMA_VERSION
+from document_processor.clinical import (
     ISO_POR_IDIOMA,
     Cifra,
     admite_copia_literal,
@@ -61,16 +61,16 @@ from src.document_processor.clinical import (
     sanitize_clinical_json,
     validate_clinical_json,
 )
-from src.document_processor.clinical.cifras_sin_fuente import (
+from document_processor.clinical.cifras_sin_fuente import (
     CampoSinFuente,
     RevisorDeCifras,
     Ruta,
 )
-from src.document_processor.clinical.nombres_sin_fuente import (
+from document_processor.clinical.nombres_sin_fuente import (
     RevisorDeNombres,
     quitar_nombres_sin_fuente,
 )
-from src.document_processor.config import (
+from document_processor.config import (
     CHUNK_MAX_CHARS,
     LLM_MAX_RETRIES,
     LLM_MAX_TOKENS,
@@ -82,9 +82,9 @@ from src.document_processor.config import (
     ROUTER_MAX_TOKENS,
     ROUTER_TEMPERATURE,
 )
-from src.document_processor.extraction import FichaTecnicaNoIngerible
-from src.document_processor.fidelity import build_fidelity_report, output_anchoring, salient_recall
-from src.document_processor.llm_config import (
+from document_processor.extraction import FichaTecnicaNoIngerible
+from document_processor.fidelity import build_fidelity_report, output_anchoring, salient_recall
+from document_processor.llm_config import (
     get_llm_api_key,
     get_llm_base_url,
     get_llm_context_tokens,
@@ -96,13 +96,13 @@ from src.document_processor.llm_config import (
     get_llm_tokens_param,
     get_llm_whole_document,
 )
-from src.document_processor.orchestration import (
+from document_processor.orchestration import (
     documento_entero,
     jerga_del_proceso,
     revision_de_sentido,
 )
-from src.document_processor.schema import ClinicalJson, DocVariant, SectionMap, SectionSpec
-from src.document_processor.sectioning import (
+from document_processor.schema import ClinicalJson, DocVariant, SectionMap, SectionSpec
+from document_processor.sectioning import (
     DocumentSection,
     SectionChunk,
     get_chunk_for_section,
@@ -110,23 +110,23 @@ from src.document_processor.sectioning import (
     partir_en_ventanas,
     split_document,
 )
-from src.document_processor.sections import (
+from document_processor.sections import (
     PROMPTS_DIR,
     SECTIONS_BY_VARIANT,
     VARIANTES_CON_PROMPT,
     system_prompt_path,
 )
-from src.document_processor.sections.cifras import (
+from document_processor.sections.cifras import (
     CAMPO_DE_CIFRAS,
     get_prompt_de_cifras,
 )
-from src.document_processor.sections.documento_por_apartados import (
+from document_processor.sections.documento_por_apartados import (
     CAMPO_DE_APARTADOS,
     CLAVE_DOCUMENTO_POR_APARTADOS,
 )
-from src.document_processor.sections.guia_clinica import get_section_prompt_cg
-from src.document_processor.sections.paper import get_section_prompt_paper
-from src.document_processor.token_cost_utils import cost_for_model, count_tokens
+from document_processor.sections.guia_clinica import get_section_prompt_cg
+from document_processor.sections.paper import get_section_prompt_paper
+from document_processor.token_cost_utils import cost_for_model, count_tokens
 
 logger = logging.getLogger(__name__)
 

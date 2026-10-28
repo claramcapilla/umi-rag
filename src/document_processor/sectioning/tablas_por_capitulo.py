@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from src.document_processor.extraction.tablas_en_rejilla import TITULO_DE_TABLA_RE
+from document_processor.extraction.tablas_en_rejilla import TITULO_DE_TABLA_RE
 
 _TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)?|[^\W\d_]{4,}")
 VOTOS_MINIMOS = 3

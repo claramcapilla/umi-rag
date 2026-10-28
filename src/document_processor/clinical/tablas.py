@@ -6,8 +6,8 @@ import re
 from collections import Counter, defaultdict
 from typing import Any
 
-from src.document_processor.extraction.redaction import MARCADOR
-from src.document_processor.schema import ClinicalJson, DocVariant
+from document_processor.extraction.redaction import MARCADOR
+from document_processor.schema import ClinicalJson, DocVariant
 
 from .contenido import fusionar_salidas
 from .tablas_markdown import TablaFuente, tablas_del_markdown

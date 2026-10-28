@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cache
 
-from src.document_processor.clinical.cifras import cifras_del_texto
-from src.document_processor.config import CHUNK_MAX_CHARS
-from src.document_processor.orchestration import documento_entero
-from src.document_processor.orchestration.clinical_formatter import sistema_y_secciones
-from src.document_processor.schema import DocVariant
-from src.document_processor.sectioning.ventanas import partir_en_ventanas
-from src.document_processor.token_cost_utils import CONTEXTO_LARGO_TOKENS, coste, count_tokens
+from document_processor.clinical.cifras import cifras_del_texto
+from document_processor.config import CHUNK_MAX_CHARS
+from document_processor.orchestration import documento_entero
+from document_processor.orchestration.clinical_formatter import sistema_y_secciones
+from document_processor.schema import DocVariant
+from document_processor.sectioning.ventanas import partir_en_ventanas
+from document_processor.token_cost_utils import CONTEXTO_LARGO_TOKENS, coste, count_tokens
 
 SOBRECOSTE_DE_REJILLA_DESCONOCIDA = 0.139
 SALIDA_POR_TOKEN_DE_JSON = 1.065

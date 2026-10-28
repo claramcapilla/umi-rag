@@ -6,7 +6,7 @@ import math
 import re
 from typing import Any
 
-from src.document_processor.token_cost_utils import count_tokens
+from document_processor.token_cost_utils import count_tokens
 
 _PREFIJOS_CON_CACHE_EXPLICITA = ("gpt-6", "gpt-5.6")
 _MARCA_DE_CACHE = {"prompt_cache_breakpoint": {"mode": "explicit"}}

@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.document_processor.schema import NON_DOCUMENT_PROVENANCE, DocVariant
-from src.document_processor.sections import SECTIONS_BY_VARIANT
+from document_processor.schema import NON_DOCUMENT_PROVENANCE, DocVariant
+from document_processor.sections import SECTIONS_BY_VARIANT
 
 logger = logging.getLogger(__name__)
 

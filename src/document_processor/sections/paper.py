@@ -12,7 +12,7 @@ hallazgos ricos; un metaanálisis usará n_studies_included.
 
 from __future__ import annotations
 
-from src.document_processor.schema import SectionMap
+from document_processor.schema import SectionMap
 
 from .cifras import sin_marcas_de_extracto
 from .documento_por_apartados import CLAVE_DOCUMENTO_POR_APARTADOS, SECCION_DOCUMENTO_POR_APARTADOS

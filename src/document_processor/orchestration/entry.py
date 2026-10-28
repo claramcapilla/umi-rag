@@ -12,11 +12,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from src.document_processor.extraction import ConversionError, clean_markdown, convert_pdf
-from src.document_processor.extraction.redaction import redact_personal_data
-from src.document_processor.extraction.tablas_en_rejilla import tablas_en_rejilla
-from src.document_processor.llm_config import get_llm_table_grid, get_llm_whole_document
-from src.document_processor.schema import ClinicalJson
+from document_processor.extraction import ConversionError, clean_markdown, convert_pdf
+from document_processor.extraction.redaction import redact_personal_data
+from document_processor.extraction.tablas_en_rejilla import tablas_en_rejilla
+from document_processor.llm_config import get_llm_table_grid, get_llm_whole_document
+from document_processor.schema import ClinicalJson
 
 from .clinical_formatter import Enrutado, generate_clinical_json_with_llm
 

@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
-from src.document_processor.config import HEADING_RE as _HEADING_RE
+from document_processor.config import HEADING_RE as _HEADING_RE
 
 
 class SectionCategory(StrEnum):

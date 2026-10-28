@@ -14,8 +14,8 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from src.document_processor.schema import ClinicalJson, DocVariant, SectionMap
-from src.document_processor.sections import SECTIONS_BY_VARIANT
+from document_processor.schema import ClinicalJson, DocVariant, SectionMap
+from document_processor.sections import SECTIONS_BY_VARIANT
 
 from .contenido import (
     CADENA_NULA,

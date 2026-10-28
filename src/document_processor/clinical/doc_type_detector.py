@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import re
 
-from src.document_processor.config import (
+from document_processor.config import (
     DETECTOR_GUIDELINE_THRESHOLD,
     DETECTOR_SMPC_THRESHOLD,
     ROUTER_CLASSIFY_CHARS,
 )
-from src.document_processor.schema import DocVariant
+from document_processor.schema import DocVariant
 
 _SMPC_HEADING = r"^[ \t]*#{0,6}[ \t]*"
 _SMPC_HEADING_NUMBERED = _SMPC_HEADING + r"(?:\d+[.)]?[ \t]+)?"

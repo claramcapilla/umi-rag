@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.document_processor.schema import SectionSpec
+from document_processor.schema import SectionSpec
 
 CLAVE_DOCUMENTO_POR_APARTADOS = "document_by_section"
 CAMPO_DE_APARTADOS = "document_sections"

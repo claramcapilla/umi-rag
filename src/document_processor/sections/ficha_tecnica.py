@@ -12,7 +12,7 @@ en un Markdown convertido, y ese Markdown ya no existe en este camino.
 
 from __future__ import annotations
 
-from src.document_processor.schema import SectionMap
+from document_processor.schema import SectionMap
 
 SECTIONS_FT: SectionMap = {
     "identification": {

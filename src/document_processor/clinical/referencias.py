@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from src.document_processor.schema import ClinicalJson
+from document_processor.schema import ClinicalJson
 
 _MAX_CARACTERES_EN_MENSAJE = 40
 _REGIMENES = ("recommended_regimens", "alternative_regimens", "not_recommended")

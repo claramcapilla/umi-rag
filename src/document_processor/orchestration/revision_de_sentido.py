@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from src.document_processor.orchestration.documento_entero import json_en_marco
-from src.document_processor.schema import ClinicalJson
+from document_processor.orchestration.documento_entero import json_en_marco
+from document_processor.schema import ClinicalJson
 
 NUMERO_RE = re.compile(r"\d+(?:[.,]\d+)?")
 _PARTE_DE_RUTA_RE = re.compile(r"[^.\[\]]+|\[\d{1,6}\]")

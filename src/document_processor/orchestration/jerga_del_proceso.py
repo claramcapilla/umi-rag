@@ -6,8 +6,8 @@ from collections import Counter
 from collections.abc import Iterator
 from typing import Any
 
-from src.document_processor.orchestration.documento_entero import json_en_marco
-from src.document_processor.orchestration.revision_de_sentido import (
+from document_processor.orchestration.documento_entero import json_en_marco
+from document_processor.orchestration.revision_de_sentido import (
     NUMERO_RE,
     Correccion,
     buscar_hueco,

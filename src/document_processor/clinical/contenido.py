@@ -5,7 +5,7 @@ from collections import Counter
 from collections.abc import Iterator
 from typing import Any
 
-from src.document_processor.schema import ClinicalJson, DocVariant
+from document_processor.schema import ClinicalJson, DocVariant
 
 from .cifras_sin_fuente import cifras_sin_fuente
 from .referencias import referencias_rotas

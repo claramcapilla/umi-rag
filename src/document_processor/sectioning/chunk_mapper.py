@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.document_processor.config import (
+from document_processor.config import (
     CHUNK_HEAD_CONTEXT_CHARS,
     CHUNK_MAX_CHARS,
     CHUNK_TAIL_CONTEXT_CHARS,
 )
-from src.document_processor.sections.documento_por_apartados import CLAVE_DOCUMENTO_POR_APARTADOS
+from document_processor.sections.documento_por_apartados import CLAVE_DOCUMENTO_POR_APARTADOS
 
 from .section_splitter import (
     DocumentSection,

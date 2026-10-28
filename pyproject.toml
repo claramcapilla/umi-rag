@@ -7,8 +7,12 @@ requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "django>=5.0,<6",
+    "httpx>=0.27,<1",
+    "openai>=1.0,<2",
     "opendataloader-pdf>=2.0.0,<3",
     "pikepdf>=9,<10",
+    "requests>=2.31,<3",
+    "tiktoken>=0.7,<1",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +28,9 @@ indexing = [
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+[tool.pyright]
+extraPaths = ["src", "web"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = [
@@ -31,5 +38,6 @@ include = [
     "document_processor*",
     "generation*",
     "indexing*",
+    "rag*",
     "retrieval*",
 ]

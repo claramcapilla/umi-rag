@@ -23,6 +23,13 @@ indexing = [
     "sentence-transformers",
     "torch",
 ]
+chunking = [
+    "numpy",
+    "pandas",
+    "psutil",
+    "pydantic",
+    "transformers",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -35,6 +42,7 @@ extraPaths = ["src", "web"]
 where = ["src"]
 include = [
     "chatbot*",
+    "chunking*",
     "document_processor*",
     "generation*",
     "indexing*",

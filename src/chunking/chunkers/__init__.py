@@ -1,0 +1,1 @@
+"""Estrategias disponibles para dividir documentos en chunks."""

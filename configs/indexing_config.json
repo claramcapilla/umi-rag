@@ -10,7 +10,7 @@
     "collection_name": "umi_rag"
   },
   "embeddings": {
-    "model_name": null,
+    "model_name": "BAAI/bge-m3",
     "device": "cpu",
     "normalize_embeddings": true,
     "trust_remote_code": false,

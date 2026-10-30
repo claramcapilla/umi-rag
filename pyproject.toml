@@ -40,12 +40,3 @@ extraPaths = ["src", "web"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = [
-    "chatbot*",
-    "chunking*",
-    "document_processor*",
-    "generation*",
-    "indexing*",
-    "rag*",
-    "retrieval*",
-]

@@ -15,6 +15,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "chat",
+    "library.apps.LibraryConfig",
+    "documents.apps.DocumentsConfig",
+    "simple_history",
+    "pipeline.apps.PipelineConfig",
 ]
 
 MIDDLEWARE = [
@@ -103,3 +107,17 @@ LLM_WHOLE_DOCUMENT = False
 LLM_CONTEXT_TOKENS = 0
 LLM_TABLE_GRID = False
 LLM_MAX_PARALLEL_WORKERS = 1
+
+# Celery y Redis
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+
+CELERY_TIMEZONE = "Europe/Madrid"
+
+# Activar la indexación automática cuando termine el procesamiento.
+# De momento la dejamos desactivada hasta probar Qdrant.
+INGEST_INDEXING_ENABLED = False

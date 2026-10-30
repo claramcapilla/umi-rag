@@ -102,3 +102,20 @@ def upsert_chunks(
             client.upsert(collection_name=collection_name, points=points)
             updated_count += len(points)
     return updated_count
+
+
+def delete_points(
+    client: QdrantClient,
+    collection_name: str,
+    point_ids: list[str],
+) -> None:
+    """Elimina de Qdrant los puntos indicados."""
+
+    if not point_ids:
+        return
+
+    client.delete(
+        collection_name=collection_name,
+        points_selector=models.PointIdsList(points=point_ids),
+        wait=True,
+    )

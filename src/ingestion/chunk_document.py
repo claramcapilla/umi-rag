@@ -15,6 +15,7 @@ from chunking.chunkers.json import (
     DOCUMENT_PLAN_GL,
     DOCUMENT_PLAN_FC,
 )
+from chunking.chunkers.json.document_context import CONTEXT_FIELDS
 from chunking.config import load_config
 
 
@@ -69,6 +70,7 @@ def chunk_clinical_document(
         document_plan=DOCUMENT_PLANS[document_type],
         root_field=None,
         indivisible_list_paths=set(INDIVISIBLE_LIST_PATHS[document_type]),
+        context_fields=CONTEXT_FIELDS[document_type],
     )
 
     chunks = chunker.chunk_document(clinical_json)

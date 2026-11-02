@@ -59,6 +59,7 @@ from chunking.chunkers.json import (
     DOCUMENT_PLAN_PAPER,
     HierarchicalJSONChunker,
 )
+from chunking.chunkers.json.document_context import CONTEXT_FIELDS
 
 # ============================================================
 # RUTAS
@@ -141,19 +142,6 @@ INDIVISIBLE_LIST_PATHS = {
     "guideline": ["toc", "references", "abbreviations", "metadata.authors"],
 
     "ficha_tecnica": ["excipients","national_codes","national_codes_queried"],
-}
-
-# CAMPOS DE CONTEXTO
-# Campos del documento que se copian en metadata["context"] de todos sus
-# chunks, para identificar de qué documento procede cada fragmento.
-
-CONTEXT_FIELDS = {
-
-    "paper": ["doi", "title"],
-
-    "guideline": ["metadata.title"],
-
-    "ficha_tecnica": ["medicine_name", "pharmaceutical_form"],
 }
 
 # ============================================================

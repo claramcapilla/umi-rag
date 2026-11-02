@@ -380,7 +380,7 @@ def main(
     cache_fingerprints = {}
     for doc in documents:
         fingerprint = cache_fingerprint({
-            "version": 2,
+            "version": 1,
             "chunker": "HierarchicalJSONChunker",
             "document_type": doc["document_type"],
             "context_fields": CONTEXT_FIELDS[doc["document_type"]],

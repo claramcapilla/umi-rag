@@ -7,9 +7,9 @@
         "workers": 1
     },
     "tokenizer": {
-        "model_name": "jinaai/jina-embeddings-v2-base-es",
+        "model_name": "Qwen/Qwen3-Embedding-4B",
         "add_special_tokens": true,
-        "max_tokens": 512,
-        "target_tokens": 256
+        "max_tokens": 32768,
+        "target_tokens": 1024
     }
 }

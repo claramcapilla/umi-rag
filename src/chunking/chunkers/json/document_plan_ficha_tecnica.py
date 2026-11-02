@@ -3,46 +3,43 @@ from chunking.chunkers.json.JSON_chunker import SplitNode
 DOCUMENT_PLAN_FC = SplitNode(
     name="complete_document",
     children=[
-        # identification: medicine_name, composition, pharmaceutical_form, indications 
+        # identification: medicine_name, pharmaceutical_form, composition
         SplitNode(
             name="identification",
             children=[
                 SplitNode(
-                    name="medicine_name_composition_pharmaceutical_form",
+                    name="medicine_name_pharmaceutical_form",
                     children=[
                         SplitNode(
-                            name="medicine_name_pharmaceutical_form",
-                            children=[
-                                SplitNode(
-                                    name="medicine_name",
-                                    fields=["medicine_name"]
-                                ),
-                                SplitNode(
-                                    name="pharmaceutical_form",
-                                    fields=["pharmaceutical_form"]
-                                )
-                            ]
+                            name="medicine_name",
+                            fields=["medicine_name"]
                         ),
                         SplitNode(
-                            name="composition",
-                            children=[
-                                SplitNode(
-                                    name="active_ingredient_amount",
-                                    fields=["active_ingredient_amount"]
-                                ),
-                                SplitNode(
-                                    name="excipients_with_know_effect",
-                                    fields=["excipients_with_know_effect"]
-                                )
-                            ]
+                            name="pharmaceutical_form",
+                            fields=["pharmaceutical_form"]
                         )
                     ]
                 ),
                 SplitNode(
-                    name="indications",
-                    fields=["indications"]
+                    name="composition",
+                    children=[
+                        SplitNode(
+                            name="active_ingredient_amount",
+                            fields=["composition.active_ingredient_amount"]
+                        ),
+                        SplitNode(
+                            name="excipients_with_known_effect",
+                            fields=["composition.excipients_with_known_effect"]
+                        )
+                    ]
                 )
             ]
+        ),
+
+        # indications
+        SplitNode(
+            name="indications",
+            fields=["indications"]
         ),
 
         # posology
@@ -167,26 +164,13 @@ DOCUMENT_PLAN_FC = SplitNode(
         ),
 
         # administration: active_ingredient, strength, route_of_administration
+        # Hoja única: por seguridad clínica, estos tres campos no se separan
         SplitNode(
             name="administration",
-            children=[
-                SplitNode(
-                    name="active_ingredient_strength",
-                    children=[
-                        SplitNode(
-                            name="active_ingredient",
-                            fields=["active_ingredient"]
-                        ),
-                        SplitNode(
-                            name="strength",
-                            fields=["strength"]
-                        )
-                    ]
-                ),
-                SplitNode(
-                    name="route_of_administration",
-                    fields=["route_of_administration"]
-                )
+            fields=[
+                "active_ingredient",
+                "strength",
+                "route_of_administration"
             ]
         ),
 

@@ -1,7 +1,3 @@
-# ============================================================
-# CHUNKING JSON
-# ============================================================
-
 """
 Ejecuta el chunking jerárquico para documentos JSON estructurados.
 
@@ -54,12 +50,9 @@ from chunking.config import load_config, resolve_config_path
 # ============================================================
 
 from chunking.chunkers.json import (
-    DOCUMENT_PLAN_FC,
-    DOCUMENT_PLAN_GL,
-    DOCUMENT_PLAN_PAPER,
     HierarchicalJSONChunker,
+    get_document_config,
 )
-from chunking.chunkers.json.document_context import CONTEXT_FIELDS
 
 # ============================================================
 # RUTAS
@@ -69,26 +62,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "chunker_config.json"
 
 # ============================================================
-# SELECCIÓN DEL DOCUMENT PLAN
+# DETECCIÓN DEL TIPO DOCUMENTAL
 # ============================================================
-
-DOCUMENT_PLANS = {
-    "paper": DOCUMENT_PLAN_PAPER,
-    "guideline": DOCUMENT_PLAN_GL,
-    "ficha_tecnica": DOCUMENT_PLAN_FC,
-}
-
-
-def select_document_plan(document_type: str):
-    try:
-        return DOCUMENT_PLANS[document_type]
-    except KeyError as error:
-        available_types = ", ".join(DOCUMENT_PLANS)
-        raise ValueError(
-            f"Tipo de documento no soportado: {document_type!r}. "
-            f"Tipos disponibles: {available_types}"
-        ) from error
-
 
 FICHA_TECNICA_SIGNATURE = {
     "medicine_name",
@@ -98,12 +73,13 @@ FICHA_TECNICA_SIGNATURE = {
     "posology",
 }
 
-
 def detect_document_type(
     data: Dict[str, Any],
     source_path: str,
 ) -> str:
     keys = set(data)
+    # La firma específica de ficha técnica tiene prioridad sobre los campos
+    # genéricos que puedan aparecer en otros tipos de documento.
     if FICHA_TECNICA_SIGNATURE.issubset(keys):
         return "ficha_tecnica"
 
@@ -111,6 +87,8 @@ def detect_document_type(
     if isinstance(declared_type, str) and declared_type.strip():
         normalized_type = declared_type.strip().casefold().replace("-", "_")
         if normalized_type in {"guideline", "clinical_guideline"}:
+            # article_type identifica papers; su presencia junto a guideline
+            # indica que el JSON declara tipos incompatibles.
             if data.get("article_type"):
                 raise ValueError(
                     f"El documento {source_path!r} contiene señales "
@@ -133,17 +111,6 @@ def detect_document_type(
     )
 
 
-# INVIDISIBLE LIST PATHS
-
-INDIVISIBLE_LIST_PATHS = {
-
-    "paper": ["authors", "keywords"],
-
-    "guideline": ["toc", "references", "abbreviations", "metadata.authors"],
-
-    "ficha_tecnica": ["excipients","national_codes","national_codes_queried"],
-}
-
 # ============================================================
 # PARALELIZACIÓN DE DOCUMENTOS
 # ============================================================
@@ -155,6 +122,8 @@ def _initialize_worker(
     model_name: str,
     add_special_tokens: bool,
 ) -> None:
+    # Cada hilo mantiene su propio contador para evitar compartir estado
+    # mutable del tokenizer entre workers.
     tokenizer = create_tokenizer(model_name)
     _WORKER_CONTEXT.token_counter = create_token_counter(
         tokenizer,
@@ -170,16 +139,15 @@ def _process_document(
 ) -> Dict[str, Any]:
     token_counter = _WORKER_CONTEXT.token_counter
     original_token_count = token_counter(doc["full_text"])
+    document_config = get_document_config(doc["document_type"])
     chunker = HierarchicalJSONChunker(
         target_tokens=target_tokens,
         max_tokens=max_tokens,
         token_counter=token_counter,
-        document_plan=select_document_plan(doc["document_type"]),
+        document_plan=document_config.plan,
         root_field=None,
-        indivisible_list_paths=set(
-            INDIVISIBLE_LIST_PATHS[doc["document_type"]],
-        ),
-        context_fields=CONTEXT_FIELDS[doc["document_type"]],
+        indivisible_list_paths=set(document_config.indivisible_list_paths),
+        context_fields=list(document_config.context_fields),
     )
 
     process = psutil.Process(os.getpid()) if measure_ram else None
@@ -346,6 +314,8 @@ def main(
             "full_text": full_text,
         })
 
+    # 2. Preparar metadatos y conservar las filas del resumen de documentos
+    # que no forman parte de esta ejecución.
     # La estrategia JSON elegida es la única que ejecuta este runner.
     strategy_name = "JSONChunking"
     abbreviation = "JC"
@@ -364,6 +334,8 @@ def main(
     else:
         retained_summary = previous_summary
 
+    # 3. Reutilizar resultados solo si coinciden el contenido y los parámetros;
+    # así se reprocesan documentos cuando cambia la entrada o la configuración.
     pending_documents = []
     cache_fingerprints = {}
     for doc in documents:
@@ -371,7 +343,9 @@ def main(
             "version": 1,
             "chunker": "HierarchicalJSONChunker",
             "document_type": doc["document_type"],
-            "context_fields": CONTEXT_FIELDS[doc["document_type"]],
+            "context_fields": get_document_config(
+                doc["document_type"]
+            ).context_fields,
             "content": doc["full_text"],
             "tokenizer_model": model_name,
             "add_special_tokens": add_special_tokens,

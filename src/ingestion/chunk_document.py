@@ -11,29 +11,13 @@ from typing import Any
 from chunking.utilities import create_tokenizer, create_token_counter
 from chunking.chunkers.json import (
     HierarchicalJSONChunker,
-    DOCUMENT_PLAN_PAPER,
-    DOCUMENT_PLAN_GL,
-    DOCUMENT_PLAN_FC,
+    get_document_config,
 )
-from chunking.chunkers.json.document_context import CONTEXT_FIELDS
 from chunking.config import load_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_FILE = PROJECT_ROOT / "configs" / "chunker_config.json"
-
-DOCUMENT_PLANS = {
-    "paper": DOCUMENT_PLAN_PAPER,
-    "guideline": DOCUMENT_PLAN_GL,
-    "ficha_tecnica": DOCUMENT_PLAN_FC,
-}
-
-INDIVISIBLE_LIST_PATHS = {
-    "paper": ["authors", "keywords"],
-    "guideline": ["toc", "references", "abbreviations", "metadata.authors"],
-    "ficha_tecnica": ["excipients", "national_codes", "national_codes_queried"],
-}
-
 
 def chunk_clinical_document(
     clinical_json: dict[str, Any],
@@ -52,8 +36,7 @@ def chunk_clinical_document(
     max_tokens = int(tokenizer_config["max_tokens"])
     add_special_tokens = tokenizer_config.get("add_special_tokens", True)
 
-    if document_type not in DOCUMENT_PLANS:
-        raise ValueError(f"Tipo documental no soportado: {document_type}")
+    document_config = get_document_config(document_type)
 
     # Crear el mismo contador de tokens que utiliza el runner original.
     tokenizer = create_tokenizer(model_name)
@@ -67,10 +50,10 @@ def chunk_clinical_document(
         target_tokens=target_tokens,
         max_tokens=max_tokens,
         token_counter=token_counter,
-        document_plan=DOCUMENT_PLANS[document_type],
+        document_plan=document_config.plan,
         root_field=None,
-        indivisible_list_paths=set(INDIVISIBLE_LIST_PATHS[document_type]),
-        context_fields=CONTEXT_FIELDS[document_type],
+        indivisible_list_paths=set(document_config.indivisible_list_paths),
+        context_fields=list(document_config.context_fields),
     )
 
     chunks = chunker.chunk_document(clinical_json)

@@ -10,7 +10,6 @@ from celery import shared_task
 from django.db import transaction
 
 from documents.models import SourceDocument, Stage, Status
-from ingestion.index_document import index_clinical_document
 from .errors import error_summary
 
 logger = logging.getLogger(__name__)
@@ -85,6 +84,8 @@ def index_document(doc_id: str) -> None:
         }
 
         document_type = document_types[doc.doc_type]
+
+        from ingestion.index_document import index_clinical_document
 
         result = index_clinical_document(
             clinical_json=clinical_json,

@@ -27,7 +27,6 @@ chunking = [
     "numpy",
     "pandas",
     "psutil",
-    "pydantic",
     "transformers",
 ]
 web = [

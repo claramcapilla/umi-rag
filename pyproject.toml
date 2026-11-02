@@ -3,7 +3,7 @@
 name = "umi-rag"
 version = "0.1.0"
 description = "Sistema RAG con procesamiento documental clínico"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 
 dependencies = [
     "django>=5.0,<6",
@@ -29,6 +29,11 @@ chunking = [
     "psutil",
     "pydantic",
     "transformers",
+]
+web = [
+    "celery[redis]>=5.4,<6",
+    "django-simple-history>=3.7,<4",
+    "whitenoise>=6.6,<7",
 ]
 
 [build-system]

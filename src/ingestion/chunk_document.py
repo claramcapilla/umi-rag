@@ -62,7 +62,7 @@ def chunk_clinical_document(
         add_special_tokens=add_special_tokens,
     )
 
-    # Reutilizar directamente tu HierarchicalJSONChunker.
+    # Reutilizar directamente HierarchicalJSONChunker.
     chunker = HierarchicalJSONChunker(
         target_tokens=target_tokens,
         max_tokens=max_tokens,
@@ -75,7 +75,7 @@ def chunk_clinical_document(
 
     chunks = chunker.chunk_document(clinical_json)
 
-    # Convertir la salida a los registros que espera tu indexador.
+    # Convertir la salida a los registros que espera el indexador.
     normalized = []
 
     for index, chunk in enumerate(chunks):

@@ -143,6 +143,19 @@ INDIVISIBLE_LIST_PATHS = {
     "ficha_tecnica": ["excipients","national_codes","national_codes_queried"],
 }
 
+# CAMPOS DE CONTEXTO
+# Campos del documento que se copian en metadata["context"] de todos sus
+# chunks, para identificar de qué documento procede cada fragmento.
+
+CONTEXT_FIELDS = {
+
+    "paper": ["doi", "title"],
+
+    "guideline": ["metadata.title"],
+
+    "ficha_tecnica": ["medicine_name", "pharmaceutical_form"],
+}
+
 # ============================================================
 # PARALELIZACIÓN DE DOCUMENTOS
 # ============================================================
@@ -175,7 +188,10 @@ def _process_document(
         token_counter=token_counter,
         document_plan=select_document_plan(doc["document_type"]),
         root_field=None,
-        indivisible_list_paths=INDIVISIBLE_LIST_PATHS[doc["document_type"]],
+        indivisible_list_paths=set(
+            INDIVISIBLE_LIST_PATHS[doc["document_type"]],
+        ),
+        context_fields=CONTEXT_FIELDS[doc["document_type"]],
     )
 
     process = psutil.Process(os.getpid()) if measure_ram else None
@@ -364,9 +380,10 @@ def main(
     cache_fingerprints = {}
     for doc in documents:
         fingerprint = cache_fingerprint({
-            "version": 1,
+            "version": 2,
             "chunker": "HierarchicalJSONChunker",
             "document_type": doc["document_type"],
+            "context_fields": CONTEXT_FIELDS[doc["document_type"]],
             "content": doc["full_text"],
             "tokenizer_model": model_name,
             "add_special_tokens": add_special_tokens,

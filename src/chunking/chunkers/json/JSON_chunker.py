@@ -493,6 +493,11 @@ class HierarchicalJSONChunker:
     #     bajo el grupo "unmapped_content"
 
     # 13. El conteo de tokens se realiza mediante la función token_counter proporcionada
+
+    # 14. Los campos indicados en context_fields (por ejemplo, el DOI de un paper o el
+    #     nombre de un medicamento) se copian en metadata["context"] de todos los chunks
+    #     del documento para identificar su procedencia. No se añaden al texto del chunk,
+    #     por lo que no cuentan como tokens ni influyen en el embedding
     def __init__(
         self,
         target_tokens: int,
@@ -501,6 +506,7 @@ class HierarchicalJSONChunker:
         document_plan: SplitNode,
         root_field: str | None = None,
         indivisible_list_paths: set[str] | None = None,
+        context_fields: list[str] | None = None,
     ) -> None:
         if target_tokens <= 0:
             raise ValueError(
@@ -524,6 +530,9 @@ class HierarchicalJSONChunker:
         self.indivisible_list_paths = set(
             indivisible_list_paths or []
         )
+        # Rutas de los campos del documento que se copian como contexto
+        # en los metadatos de todos los chunks.
+        self.context_fields = list(dict.fromkeys(context_fields or []))
 
     def chunk_document(self, document: dict[str, Any]) -> list[Chunk]:
         if not isinstance(document, dict):
@@ -563,6 +572,13 @@ class HierarchicalJSONChunker:
                 final_chunks.extend(self._split_oversized_chunk(chunk))
             else:
                 final_chunks.append(chunk)
+
+        # El contexto se añade al final para que también lo reciban los chunks
+        # generados por el fallback y por unmapped_content.
+        context = self._resolve_context(data)
+        if context:
+            for chunk in final_chunks:
+                chunk.metadata["context"] = dict(context)
         return final_chunks
 
 
@@ -739,6 +755,21 @@ class HierarchicalJSONChunker:
             out.append(current)
         assert "".join(out) == text
         return out
+
+    def _resolve_context(self, data: dict[str, Any]) -> dict[str, Any]:
+        # Localiza en el documento los campos de context_fields. La clave es
+        # la ruta completa del campo (por ejemplo, "metadata.title"). Los campos
+        # ausentes o vacíos (como un DOI null) no se incluyen.
+        if not self.context_fields:
+            return {}
+        resolved = resolve_fields(
+            SplitNode(name="context", fields=self.context_fields),
+            data,
+        )
+        return {
+            ".".join(str(part) for part in field.path): field.value
+            for field in resolved
+        }
 
     def _get_root(self, document: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         # Determina qué parte del JSON debe tratarse como raíz

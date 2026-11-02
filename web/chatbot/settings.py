@@ -90,16 +90,22 @@ LLM_BASE_URL = os.environ.get(
     "http://127.0.0.1:11434/v1"
 )
 
+# Modelo para generar los JSON clínicos
+LLM_JSON_MODEL = "qwen2.5:1.5b"
+
 LLM_ALLOWED_ENDPOINTS = [
     "http://127.0.0.1:11434/v1"
 ]
 
+# Clave requerida por el cliente OpenAI compatible con Ollama
+LLM_API_KEY = "ollama"
+
 LLM_JSON_MODEL = os.environ.get(
     "LLM_JSON_MODEL",
-    "qwen2.5:7b"
+    "qwen2.5:1.5b"
 )
 
-LLM_REASONING = ""
+LLM_REASONING = "disabled"
 LLM_SERVICE_TIER = ""
 LLM_TOKENS_PARAM = "max_tokens"
 
@@ -112,6 +118,9 @@ LLM_MAX_PARALLEL_WORKERS = 1
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
 
+CELERY_CONTROL_QUEUE_DURABLE = False
+CELERY_CONTROL_QUEUE_EXCLUSIVE = False
+
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -121,3 +130,10 @@ CELERY_TIMEZONE = "Europe/Madrid"
 # Activar la indexación automática cuando termine el procesamiento.
 # De momento la dejamos desactivada hasta probar Qdrant.
 INGEST_INDEXING_ENABLED = False
+
+# Directorio donde se almacenan los documentos procesados.
+MEDIA_ROOT = BASE_DIR.parent / "data" / "media"
+MEDIA_URL = "/media/"
+
+# Longitud máxima del Markdown antes de dividirlo en capítulos.
+GUIDE_SPLIT_MAX_CHARS = 100000

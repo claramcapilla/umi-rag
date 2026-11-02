@@ -208,7 +208,7 @@ def _convertir(
 
     Todo lo que falle antes del LLM sale como `ConversionError`; lo propaga el llamante.
     """
-    from document_processor.orchestration import (
+    from document_processor.orchestration.entry import (
         md_to_clinical_json,
         pdf_bytes_to_markdown,
         pdf_bytes_to_tablas_en_rejilla,

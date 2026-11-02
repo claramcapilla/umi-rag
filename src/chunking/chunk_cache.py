@@ -38,19 +38,24 @@ def load_cached_artifacts(
         )
         return None
 
+    if not isinstance(chunks_result, dict) or not isinstance(metrics_result, dict):
+        return None
+
+    original_token_count = metrics_result.get("original_token_count")
     if (
-        not isinstance(chunks_result, dict)
-        or not isinstance(metrics_result, dict)
-        or chunks_result.get("_cache_fingerprint") != fingerprint
+        not isinstance(original_token_count, int)
+        or isinstance(original_token_count, bool)
+        or original_token_count < 0
+    ):
+        return None
+
+    if (
+        chunks_result.get("_cache_fingerprint") != fingerprint
         or metrics_result.get("_cache_fingerprint") != fingerprint
         or not isinstance(chunks_result.get("chunks"), list)
         or chunks_result.get("number_of_chunks")
         != len(chunks_result.get("chunks", []))
-        or not isinstance(metrics_result.get("original_token_count"), int)
-        or isinstance(metrics_result.get("original_token_count"), bool)
-        or metrics_result.get("original_token_count") < 0
-        or chunks_result.get("original_token_count")
-        != metrics_result.get("original_token_count")
+        or chunks_result.get("original_token_count") != original_token_count
         or chunks_result.get("doc_id") != metrics_result.get("doc_id")
         or chunks_result.get("strategy") != metrics_result.get("strategy")
         or metrics_result.get("status") != "completed"

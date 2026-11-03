@@ -1,4 +1,3 @@
-
 """Convierte un JSON clínico en chunks normalizados para el RAG."""
 
 from __future__ import annotations

@@ -1,11 +1,16 @@
 """Convierte un JSON clínico en chunks normalizados para el RAG."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+# Chunking de documentos clínicos
 from chunking.utilities import create_tokenizer, create_token_counter
 from chunking.chunkers.json import (
     HierarchicalJSONChunker,
@@ -14,8 +19,17 @@ from chunking.chunkers.json import (
 from chunking.config import load_config
 
 
+# ============================================================
+# RUTAS Y CONFIGURACIÓN
+# ============================================================
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_FILE = PROJECT_ROOT / "configs" / "chunker_config.json"
+
+
+# ============================================================
+# GENERAR CHUNKS CLÍNICOS
+# ============================================================
 
 def chunk_clinical_document(
     clinical_json: dict[str, Any],
@@ -25,7 +39,10 @@ def chunk_clinical_document(
 ) -> list[dict[str, Any]]:
     """Procesa un documento con el chunker jerárquico existente."""
 
-    # Utilizar la misma configuración que el chunking por lotes.
+    # ========================================================
+    # CARGAR CONFIGURACIÓN DEL CHUNKER
+    # ========================================================
+
     config = load_config(CONFIG_FILE)
     tokenizer_config = config["tokenizer"]
 
@@ -36,14 +53,20 @@ def chunk_clinical_document(
 
     document_config = get_document_config(document_type)
 
-    # Crear el mismo contador de tokens que utiliza el runner original.
+    # ========================================================
+    # PREPARAR EL CONTADOR DE TOKENS
+    # ========================================================
+
     tokenizer = create_tokenizer(model_name)
     token_counter = create_token_counter(
         tokenizer,
         add_special_tokens=add_special_tokens,
     )
 
-    # Reutilizar directamente HierarchicalJSONChunker.
+    # ========================================================
+    # CONFIGURAR Y EJECUTAR EL CHUNKER
+    # ========================================================
+
     chunker = HierarchicalJSONChunker(
         target_tokens=target_tokens,
         max_tokens=max_tokens,
@@ -56,7 +79,10 @@ def chunk_clinical_document(
 
     chunks = chunker.chunk_document(clinical_json)
 
-    # Convertir la salida a los registros que espera el indexador.
+    # ========================================================
+    # NORMALIZAR LOS REGISTROS PARA INDEXACIÓN
+    # ========================================================
+
     normalized = []
 
     for index, chunk in enumerate(chunks):

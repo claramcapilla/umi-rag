@@ -167,3 +167,13 @@ CIMA_TIMEOUT = 30
 CIMA_MAX_BYTES = 8 * 1024 * 1024
 CIMA_REQUEST_DELAY = 0.25
 CIMA_USER_AGENT = "docsrepo/1.0 (gestion documental RAG clinico)"
+
+# ============================================================
+# SERVICIO HÍBRIDO DE CONVERSIÓN PDF - DOCSREPO
+# ============================================================
+
+CHUNKING_HYBRID_URL = "http://localhost:5002"
+
+CHUNKING_HYBRID_ALLOWED_ENDPOINTS = [
+    "http://localhost:5002"
+]

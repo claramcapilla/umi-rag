@@ -7,15 +7,15 @@
   "qdrant": {
     "host": "127.0.0.1",
     "port": 6333,
-    "collection_name": "umi_rag"
+    "collection_name": "umi_rag_test"
   },
   "embeddings": {
-    "model_name": "Qwen/Qwen3-Embedding-4B",
+    "model_name": "intfloat/multilingual-e5-small",
     "device": "cpu",
     "normalize_embeddings": true,
     "trust_remote_code": false,
-    "document_prefix": "",
-    "query_prefix": ""
+    "document_prefix": "passage: ",
+    "query_prefix": "query:"
   },
   "indexing": {
     "batch_size": 32,

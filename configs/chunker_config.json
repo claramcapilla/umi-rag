@@ -7,9 +7,9 @@
         "workers": 1
     },
     "tokenizer": {
-        "model_name": "Qwen/Qwen3-Embedding-4B",
+        "model_name": "intfloat/multilingual-e5-small",
         "add_special_tokens": true,
-        "max_tokens": 32768,
-        "target_tokens": 1024
+        "max_tokens": 512,
+        "target_tokens":256
     }
 }

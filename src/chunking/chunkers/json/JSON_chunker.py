@@ -519,12 +519,13 @@ class HierarchicalJSONChunker:
         )
         self.context_fields = list(dict.fromkeys(context_fields or []))
 
-    def chunk_document(self, document: dict[str, Any]) -> list[Chunk]:
+    def chunk_document(self, document: object) -> list[Chunk]:
         """Divide un documento y devuelve sus chunks con metadatos de origen.
 
         Incluye las ramas presentes que no estén descritas por el plan, aplica
         el fallback a los chunks sobre ``max_tokens`` y añade el contexto
-        configurado a los metadatos.
+        configurado a los metadatos. El parámetro acepta ``object`` para poder
+        validar explícitamente que la entrada sea un diccionario JSON.
 
         Args:
             document: Objeto JSON que se va a dividir.

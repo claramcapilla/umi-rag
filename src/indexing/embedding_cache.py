@@ -34,10 +34,14 @@ def _text_hash(text: str) -> str:
 
 
 def _cache_path(cache_dir: Path, model_name: str) -> Path:
-    """Construye la ruta JSONL de caché correspondiente al modelo."""
-    # El modelo forma parte de la ruta para no mezclar espacios vectoriales.
+    """Construye una ruta de caché única y acotada para el nombre del modelo.
+
+    El slug facilita reconocer el modelo en el sistema de archivos; el hash
+    evita colisiones entre nombres distintos que se normalicen igual.
+    """
     safe_name = re.sub(r"[^a-zA-Z0-9]+", "_", model_name).strip("_")
-    return cache_dir / f"{safe_name}.jsonl"
+    model_hash = hashlib.sha256(model_name.encode("utf-8")).hexdigest()
+    return cache_dir / f"{safe_name[:80] or 'model'}-{model_hash}.jsonl"
 
 
 def load_cache(cache_dir: Path, model_name: str) -> dict[str, dict[str, Any]]:

@@ -1,7 +1,9 @@
 import unittest
 from types import SimpleNamespace
 
-from indexing.qdrant_store import upsert_chunks
+from qdrant_client import QdrantClient, models
+
+from indexing.qdrant_store import ensure_collection, upsert_chunks
 
 
 class InMemoryQdrant:
@@ -56,6 +58,39 @@ class IncrementalUpsertTests(unittest.TestCase):
         self.assertEqual(updated_count, 2)
         self.assertEqual(len(client.points), 3)
         self.assertEqual(len(client.upsert_calls), 2)
+
+
+class CollectionCompatibilityTests(unittest.TestCase):
+    def test_accepts_existing_cosine_collection_with_matching_dimension(self):
+        client = QdrantClient(":memory:")
+        client.create_collection(
+            collection_name="collection",
+            vectors_config=models.VectorParams(
+                size=2,
+                distance=models.Distance.COSINE,
+            ),
+        )
+
+        try:
+            ensure_collection(client, "collection", 2)
+        finally:
+            client.close()
+
+    def test_rejects_existing_collection_with_incompatible_distance(self):
+        client = QdrantClient(":memory:")
+        client.create_collection(
+            collection_name="collection",
+            vectors_config=models.VectorParams(
+                size=2,
+                distance=models.Distance.DOT,
+            ),
+        )
+
+        try:
+            with self.assertRaisesRegex(ValueError, "requiere Cosine"):
+                ensure_collection(client, "collection", 2)
+        finally:
+            client.close()
 
 
 if __name__ == "__main__":

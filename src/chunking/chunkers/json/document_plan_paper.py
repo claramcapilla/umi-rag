@@ -150,87 +150,82 @@ DOCUMENT_PLAN_PAPER = SplitNode(
         SplitNode(
             name="methods",
             children=[
+                # Diseño y características del estudio
                 SplitNode(
-                    name="design",
+                    name="design_characteristics",
                     children=[
                         SplitNode(
-                            name="design_details",
+                            name="study_design",
+                            fields=["study_design"]
+                        ),
+                        SplitNode(
+                            name="population_characteristics",
                             children=[
                                 SplitNode(
-                                    name="design_population",
+                                    name="description",
+                                    fields=["population.description"]
+                                ),
+                                SplitNode(
+                                    name="patients_age_care_setting",
                                     children=[
                                         SplitNode(
-                                            name="study_design",
-                                            fields=["study_design"]
+                                            name="n_patients",
+                                            fields=["population.n_patients"]
                                         ),
                                         SplitNode(
-                                            name="population",
+                                            name="age_care_setting",
                                             children=[
                                                 SplitNode(
-                                                    name="population_details",
-                                                    children=[
-                                                        SplitNode(
-                                                            name="description",
-                                                            fields=["population.description"]
-                                                        ),
-                                                        SplitNode(
-                                                            name="patients_age_care_setting",
-                                                            children=[
-                                                                SplitNode(
-                                                                    name="n_patients",
-                                                                    fields=["population.n_patients"]
-                                                                ),
-                                                                SplitNode(
-                                                                    name="age_care_setting",
-                                                                    children=[
-                                                                        SplitNode(
-                                                                            name="mean_age",
-                                                                            fields=["population.mean_age"]
-                                                                        ),
-                                                                        SplitNode(
-                                                                            name="care_setting",
-                                                                            fields=["care_setting"]
-                                                                        )
-                                                                    ]
-                                                                )
-                                                            ]
-                                                        )
-                                                    ]
+                                                    name="mean_age",
+                                                    fields=["population.mean_age"]
                                                 ),
                                                 SplitNode(
-                                                    name="criteria",
-                                                    children=[
-                                                        SplitNode(
-                                                            name="inclusion_criteria",
-                                                            fields=["population.inclusion_criteria"]
-                                                        ),
-                                                        SplitNode(
-                                                            name="exclusion_criteria",
-                                                            fields=["exclusion_criteria"]
-                                                        )
-                                                    ]
+                                                    name="care_setting",
+                                                    fields=["population.care_setting"]
                                                 )
                                             ]
                                         )
                                     ]
+                                )
+                            ]
+                        )
+                    ]
+                ),
+
+                # Criterios de inclusión y exclusión
+                SplitNode(
+                    name="criteria",
+                    children=[
+                        SplitNode(
+                            name="inclusion_criteria",
+                            fields=["population.inclusion_criteria"]
+                        ),
+                        SplitNode(
+                            name="exclusion_criteria",
+                            fields=["population.exclusion_criteria"]
+                        )
+                    ]
+                ),
+
+                # Intervenciones, comparadores y variables de resultado
+                SplitNode(
+                    name="interventions_outcomes",
+                    children=[
+                        SplitNode(
+                            name="interventions_comparators",
+                            children=[
+                                SplitNode(
+                                    name="interventions",
+                                    fields=["interventions"]
                                 ),
                                 SplitNode(
-                                    name="interventions_comparators",
-                                    children=[
-                                        SplitNode(
-                                            name="interventions",
-                                            fields=["interventions"]
-                                        ),
-                                        SplitNode(
-                                            name="comparators",
-                                            fields=["comparators"]
-                                        )
-                                    ]
+                                    name="comparators",
+                                    fields=["comparators"]
                                 )
                             ]
                         ),
                         SplitNode(
-                            name="output",
+                            name="outcomes",
                             children=[
                                 SplitNode(
                                     name="primary",
@@ -244,6 +239,8 @@ DOCUMENT_PLAN_PAPER = SplitNode(
                         )
                     ]
                 ),
+
+                # Estadística, seguimiento y búsqueda bibliográfica
                 SplitNode(
                     name="statistics",
                     children=[
@@ -340,8 +337,17 @@ DOCUMENT_PLAN_PAPER = SplitNode(
                                     ]
                             ),
                             SplitNode(
-                                    name="strengths",
-                                    fields=["strengths"]
+                                    name="strengths_limitations",
+                                    children=[
+                                            SplitNode(
+                                                    name="strengths",
+                                                    fields=["strengths"]
+                                            ),
+                                            SplitNode(
+                                                    name="limitations",
+                                                    fields=["limitations"]
+                                            )
+                                    ]
                             )
                         ]
                 ),

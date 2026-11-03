@@ -498,6 +498,11 @@ class HierarchicalJSONChunker:
     #     nombre de un medicamento) se copian en metadata["context"] de todos los chunks
     #     del documento para identificar su procedencia. No se añaden al texto del chunk,
     #     por lo que no cuentan como tokens ni influyen en el embedding
+
+    # 15. Si una tabla supera max_tokens, se divide por filas completas y cada parte
+    #     repite la cabecera (título, etc.). Si no tiene esa forma, se usa el fallback
+    #     por oraciones
+
     def __init__(
         self,
         target_tokens: int,
@@ -564,7 +569,7 @@ class HierarchicalJSONChunker:
                 level=1,
             ))
 
-        # NUEVO: fallback aplicado solo a los fragmentos que exceden max_tokens.
+        # Fallback aplicado solo a los fragmentos que exceden max_tokens.
         # Las agrupaciones del DOCUMENT_PLAN no cambian.
         final_chunks: list[Chunk] = []
         for chunk in chunks:
@@ -600,6 +605,11 @@ class HierarchicalJSONChunker:
         usable = limit - margin
         if usable <= 0:
             raise ValueError("max_tokens es demasiado pequeño para el fallback")
+
+        # Las tablas se dividen por filas completas repitiendo su cabecera.
+        table_parts = self._split_table_by_rows(original, usable)
+        if table_parts is not None:
+            return table_parts
 
         units = self._fallback_units(original.text, usable)
         if not units:
@@ -700,6 +710,105 @@ class HierarchicalJSONChunker:
                 metadata={**metadata,
                           "exceeds_target_limit": count > self.target_tokens,
                           "exceeds_max_limit": False},
+            ))
+        return output
+
+    # Marcador de fila que genera table_to_lines ("Row 3:")
+    _ROW_MARKER = re.compile(r"^(\s*)Row (\d+):\s*$")
+
+    def _split_table_by_rows(self, original: Chunk, usable: int) -> list[Chunk] | None:
+        """Divide una tabla demasiado grande por filas completas.
+
+        Cada parte repite la cabecera (todo lo anterior a la primera fila:
+        etiqueta, título...) para que los datos no queden sin contexto, y
+        ninguna fila se corta por la mitad. Las líneas posteriores a las filas
+        (por ejemplo, el summary) se conservan una sola vez, en la última
+        parte. Devuelve None si el texto no tiene la forma de una tabla simple
+        o si una fila no cabe junto a la cabecera; en ese caso se usa el
+        fallback por oraciones.
+        """
+        count = self.token_counter
+        lines = original.text.splitlines(keepends=True)
+        markers = [self._ROW_MARKER.match(line.rstrip("\r\n")) for line in lines]
+        first = next((i for i, m in enumerate(markers) if m), None)
+        if first is None:
+            return None
+        row_indent = len(markers[first].group(1))
+
+        # Separa cabecera, filas (con su número) y líneas finales.
+        header = lines[:first]
+        rows: list[tuple[int, list[str]]] = []
+        trailer: list[str] = []
+        for line, marker in zip(lines[first:], markers[first:]):
+            if trailer:
+                if marker:
+                    return None  # hay otra tabla después de la primera
+                trailer.append(line)
+            elif marker:
+                if len(marker.group(1)) != row_indent:
+                    return None  # tabla anidada: no es el caso simple
+                rows.append((int(marker.group(2)), [line]))
+            elif not line.strip() or len(line) - len(line.lstrip()) > row_indent:
+                rows[-1][1].append(line)
+            else:
+                trailer.append(line)
+
+        header_text = "".join(header)
+        trailer_text = "".join(trailer)
+        if count(header_text) > usable // 2:
+            return None  # una cabecera tan grande dejaría poco espacio a las filas
+
+        # Agrupa filas completas mientras quepan junto a la cabecera.
+        groups: list[list[tuple[int, list[str]]]] = []
+        current: list[tuple[int, list[str]]] = []
+        for row in rows:
+            candidate = current + [row]
+            candidate_text = header_text + "".join("".join(r[1]) for r in candidate)
+            if current and count(candidate_text) > usable:
+                groups.append(current)
+                current = [row]
+            else:
+                current = candidate
+        groups.append(current)
+
+        texts = [header_text + "".join("".join(r[1]) for r in g) for g in groups]
+        if trailer_text:
+            if count(texts[-1] + trailer_text) <= usable:
+                texts[-1] += trailer_text
+            else:
+                texts.append(header_text + trailer_text)
+                groups.append([])
+        if len(texts) < 2 or any(count(t) > usable for t in texts):
+            return None
+
+        output: list[Chunk] = []
+        for part, (text, group) in enumerate(zip(texts, groups), start=1):
+            token_count = count(text)
+            metadata = dict(original.metadata)
+            metadata.update({
+                "fallback_applied": True,
+                "fallback_method": "table_rows_with_header",
+                "fallback_part": part,
+                "fallback_total_parts": len(texts),
+                "fallback_original_tokens": original.token_count,
+                "fallback_overlap_ratio": 0,
+                "fallback_overlap_units": 0,
+                "fallback_overlap_tokens": 0,
+                "exceeds_target_limit": token_count > self.target_tokens,
+                "exceeds_max_limit": False,
+            })
+            if group:
+                metadata["table_row_range"] = [group[0][0], group[-1][0]]
+            output.append(Chunk(
+                text=text,
+                block=original.block,
+                group_name=original.group_name,
+                level=original.level,
+                json_paths=list(original.json_paths),
+                token_count=token_count,
+                exceeds_target_limit=token_count > self.target_tokens,
+                exceeds_max_limit=False,
+                metadata=metadata,
             ))
         return output
 

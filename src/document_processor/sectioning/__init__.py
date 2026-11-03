@@ -24,4 +24,9 @@ __all__ = [
     "get_sections_by_category",
     "partir_en_ventanas",
     "split_document",
+    "split_into_chapters",
+    "repartir_tablas",  
 ]
+
+from .chapter_splitter import split_into_chapters
+from .tablas_por_capitulo import repartir_tablas

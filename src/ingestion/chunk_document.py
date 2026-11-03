@@ -1,9 +1,7 @@
-
 """Convierte un JSON clínico en chunks normalizados para el RAG."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any

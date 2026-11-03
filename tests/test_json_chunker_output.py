@@ -9,6 +9,17 @@ from indexing.normalizer import iter_normalized_chunks
 
 
 class JsonChunkerOutputTests(unittest.TestCase):
+    def test_chunker_rejects_non_object_documents(self):
+        chunker = HierarchicalJSONChunker(
+            target_tokens=20,
+            max_tokens=50,
+            token_counter=lambda text: len(text.split()),
+            document_plan=DOCUMENT_PLAN_PAPER,
+        )
+
+        with self.assertRaisesRegex(TypeError, "documento debe ser un diccionario"):
+            chunker.chunk_document([])
+
     def test_hierarchical_chunks_are_accepted_by_indexing_normalizer(self):
         source_data = {
             "article_type": "research",

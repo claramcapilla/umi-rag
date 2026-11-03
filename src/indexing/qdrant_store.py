@@ -53,8 +53,8 @@ def ensure_collection(
 
     Las colecciones nuevas se configuran con un único vector denso, distancia
     coseno y la dimensión indicada. Si la colección ya existe, no se modifica:
-    se valida que use un vector denso único de esa dimensión. En caso
-    contrario, lanza ``ValueError``; nunca elimina ni recrea la colección.
+    se valida que use un vector denso único de esa dimensión y distancia. En
+    caso contrario, lanza ``ValueError``; nunca elimina ni recrea la colección.
     """
     # No borrar colecciones existentes: la creación o reemplazo de una
     # colección debe ser una decisión explícita de operación/migración.
@@ -69,6 +69,12 @@ def ensure_collection(
             raise ValueError(
                 f"La colección {collection_name} tiene dimensión {vectors.size}, "
                 f"pero el modelo configurado produce dimensión {vector_size}."
+            )
+        if vectors.distance != models.Distance.COSINE:
+            raise ValueError(
+                f"La colección {collection_name} usa distancia "
+                f"{vectors.distance}, pero la indexación requiere "
+                f"{models.Distance.COSINE}."
             )
         return
     client.create_collection(

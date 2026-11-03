@@ -1,0 +1,105 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Fichas técnicas (CIMA) · docsrepo{% endblock %}
+{% block content %}
+
+<h2 style="margin-top:0">Fichas técnicas desde CIMA</h2>
+<p class="muted">Las fichas técnicas se ingieren del registro de la AEMPS, que las sirve <strong>ya
+   segmentadas por su numeración normativa</strong>, no del PDF. Medido sobre 5 fichas, el relleno
+   del esquema es del 100% frente al 60-81% del camino PDF+LLM, sin coste y sin riesgo de
+   parafraseo sobre texto normativo.</p>
+<p class="muted">Subir el PDF de una ficha <strong>no funciona a propósito</strong>: ese camino se
+   retiró y el documento quedará como fallido remitiendo aquí.</p>
+
+<form method="get" action="{% url 'ui:cima' %}" style="margin:1rem 0">
+  <input type="search" name="q" value="{{ consulta }}" placeholder="montelukast, dupilumab, Xolair…"
+         style="min-width:22rem" required>
+  <select name="por">
+    {% for clave, etiqueta in criterios.items %}
+      <option value="{{ clave }}" {% if clave == criterio %}selected{% endif %}>{{ etiqueta }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Buscar en CIMA</button>
+</form>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% for mensaje in messages %}
+  <p class="{% if mensaje.tags == 'success' %}ok{% else %}error{% endif %}">{{ mensaje }}</p>
+{% endfor %}
+
+{% if consulta and not candidatos and not error %}
+  {% if pagina > 1 %}
+    <p class="muted">La página {{ pagina }} no tiene resultados: está pasada del final de
+       «{{ consulta }}».</p>
+  {% else %}
+    <p class="muted">Sin resultados para «{{ consulta }}».</p>
+  {% endif %}
+{% endif %}
+
+{% if candidatos %}
+<form method="post" action="{% url 'ui:cima_ingest' %}">
+  {% csrf_token %}
+  <input type="hidden" name="q" value="{{ consulta }}">
+  <input type="hidden" name="por" value="{{ criterio }}">
+  <input type="hidden" name="pagina" value="{{ pagina }}">
+  <p class="muted">{{ candidatos|length }}{% if total is not None %} de {{ total }}{% endif %} registros{% if pagina > 1 %} (página {{ pagina }}){% endif %}{% if total is None %}, y CIMA no declaró cuántos hay en total{% endif %}.
+     <strong>Elige los que hagan falta</strong>: un
+     principio activo puede tener 72 registros que comparten el 92-98% del texto, y meterlos todos
+     llena la recuperación de casi-idénticos. Si dos son el mismo documento, se detecta al
+     ingerirlos y quedan como un solo documento con los dos números de registro.
+     Máximo {{ max_por_lote }} por lote.</p>
+
+  <p>
+    <label>Especialidad:
+      <select name="especialidad" required>
+        <option value="">— elige una —</option>
+        {% for e in especialidades %}
+          <option value="{{ e.pk }}">{{ e.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <span class="muted">Obligatoria: el indexado deriva la especialidad de la colección, así que
+       una ficha sin ella no se puede indexar.</span>
+  </p>
+  <table>
+    <thead>
+      <tr><th></th><th>Nº registro</th><th>Medicamento</th><th>Laboratorio</th><th>Estado</th></tr>
+    </thead>
+    <tbody>
+      {% for c in candidatos %}
+        <tr>
+          <td>
+            {% if c.ingerible and not c.ingerido %}
+              <input type="checkbox" name="nregistro" value="{{ c.nregistro }}">
+            {% endif %}
+          </td>
+          <td><code>{{ c.nregistro }}</code></td>
+          <td>{{ c.nombre }}{% if c.generico %} <span class="muted">· EFG</span>{% endif %}</td>
+          <td class="muted">{{ c.laboratorio }}</td>
+          <td>
+            {% if c.fallido %}<span class="error">ingerida con fallo</span>
+              <a href="{% url 'ui:dashboard' %}">reintentar en reconciliación</a>
+            {% elif c.ingerido %}<span class="ok">ya ingerida</span>
+            {% elif not c.ingerible %}<span class="muted">sin ficha segmentada en CIMA</span>
+            {% elif not c.comercializado %}<span class="muted">no comercializado</span>
+            {% else %}disponible{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button type="submit">Ingerir las marcadas</button>
+</form>
+{% endif %}
+
+{% if pagina > 1 or hay_siguiente %}
+  <p class="muted">
+    {% if pagina > 1 %}
+      <a href="{% querystring pagina=pagina|add:'-1' %}">← anterior</a>
+    {% endif %}
+    {% if hay_siguiente %}
+      <a href="{% querystring pagina=pagina|add:'1' %}">siguiente →</a>
+    {% endif %}
+  </p>
+{% endif %}
+
+{% endblock %}

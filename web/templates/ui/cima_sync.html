@@ -1,0 +1,54 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Sincronización con CIMA · docsrepo{% endblock %}
+{% block content %}
+
+<style>
+  .sync-runs { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 18px; }
+  .sync-runs a { padding:5px 11px; border-radius:var(--r-full); border:1px solid var(--line);
+    background:var(--bg); color:var(--fg); font-size:13px; }
+  .sync-runs a.on { background:var(--st-idx); border-color:var(--st-idx); color:#fff; }
+  .sync-reg { font-family:var(--font-mono,monospace); font-size:12px; color:var(--muted-2); }
+</style>
+
+<h2 style="margin-top:0">Sincronización con CIMA</h2>
+<p class="muted">Cada semana se leen los cambios del registro de la AEMPS: altas, fichas actualizadas
+   y medicamentos retirados. Lo retirado sale de Chroma y se conserva aquí marcado como retirado.</p>
+
+{% if ejecuciones %}
+  <div class="sync-runs">
+    {% for r in ejecuciones %}
+      <a href="{% querystring run=r.pk %}" class="{% if elegida and r.pk == elegida.pk %}on{% endif %}">
+        {{ r.iniciada_en|date:"d/m/Y H:i" }} · {{ r.get_estado_display }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if elegida %}
+  <p>
+    {% if elegida.carga_inicial %}Carga inicial de todo lo comercializado{% else %}Cambios desde el {{ elegida.desde|date:"d/m/Y" }}{% endif %}
+    · {{ elegida.cambios_leidos }} filas leídas · {{ elegida.revisados }} registros revisados
+    {% for etiqueta, total in resumen %} · {{ etiqueta }}: {{ total }}{% endfor %}
+  </p>
+  {% if elegida.error_msg %}<p class="badge s-FAILED">{{ elegida.error_msg }}</p>{% endif %}
+
+  <table>
+    <thead><tr><th>Cambio</th><th>Medicamento</th><th>Registro</th><th>Detalle</th><th>Visto</th></tr></thead>
+    <tbody>
+      {% for e in eventos %}
+        <tr>
+          <td><span class="badge">{{ e.get_tipo_display }}</span></td>
+          <td>{% if e.document %}<a href="{% url 'ui:detail' e.document.pk %}">{{ e.nombre|default:e.nregistro }}</a>{% else %}{{ e.nombre|default:"—" }}{% endif %}</td>
+          <td class="sync-reg">{{ e.nregistro }}</td>
+          <td class="muted">{{ e.detalle }}</td>
+          <td class="muted">{{ e.visto_en|date:"d/m/Y H:i"|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="muted">Sin cambios que registrar en esta ejecución.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if eventos_total > eventos|length %}<p class="muted">Se muestran {{ eventos|length }} de {{ eventos_total }}.</p>{% endif %}
+{% else %}
+  <p class="muted">Todavía no se ha sincronizado nunca con CIMA.</p>
+{% endif %}
+{% endblock %}

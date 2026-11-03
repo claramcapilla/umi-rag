@@ -1,0 +1,72 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Fichas técnicas · docsrepo{% endblock %}
+{% block content %}
+
+<style>
+  .ft-facets { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 18px; }
+  .ft-facets a { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:var(--r-full);
+    border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:13px; }
+  .ft-facets a.on { background:var(--st-idx); border-color:var(--st-idx); color:#fff; }
+  .ft-facets a .n { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ft-facets a.on .n { color:#fff; }
+  .ft-atc { display:inline-block; margin:2px 4px 2px 0; padding:1px 8px; border-radius:var(--r-full);
+    background:var(--bg-3); font-size:11px; color:var(--muted); }
+  .ft-pa { color:var(--muted); font-size:13px; }
+  .ft-regs { font-family:var(--font-mono,monospace); font-size:12px; color:var(--muted-2); }
+  .ft-search { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  .ft-search input[type=search] { min-width:22rem; }
+  .pager { display:flex; gap:16px; align-items:center; margin:18px 0; color:var(--muted); }
+</style>
+
+<h2 style="margin-top:0">Fichas técnicas</h2>
+<p class="muted">Búsqueda sobre las fichas ya ingeridas desde CIMA, agrupadas por grupo ATC.
+   ¿No está aquí? <a href="{% url 'ui:cima' %}">Búscala en el registro de CIMA →</a></p>
+
+<form method="get" action="{% url 'ui:fichas' %}" class="ft-search">
+  {% if grupo_activo %}<input type="hidden" name="atc" value="{{ grupo_activo }}">{% endif %}
+  <input type="search" name="q" value="{{ consulta }}"
+         placeholder="daratumumab, Darzalex, nº de registro…">
+  <button type="submit">Buscar</button>
+  {% if consulta %}<a class="muted" href="{% querystring q=None page=None %}">limpiar</a>{% endif %}
+</form>
+
+<div class="ft-facets">
+  <a href="{% querystring atc=None page=None %}" class="{% if not grupo_activo %}on{% endif %}">Todos</a>
+  {% for g in grupos %}
+    <a href="{% querystring atc=g.code page=None %}" class="{% if g.code == grupo_activo %}on{% endif %}"
+       title="{{ g.label }}">{{ g.label }} <span class="n">{{ g.n }}</span></a>
+  {% endfor %}
+</div>
+
+<p class="muted">{{ total }} ficha{{ total|pluralize:"s" }}{% if grupo_activo or consulta %} en este filtro{% endif %}.</p>
+
+<table>
+  <thead>
+    <tr><th>Medicamento</th><th>Principio activo</th><th>ATC</th><th>Nº registro</th><th>Estado</th></tr>
+  </thead>
+  <tbody>
+    {% for fila in filas %}
+      <tr>
+        <td><a href="{% url 'ui:detail' fila.doc.pk %}">{{ fila.doc.title|default:fila.doc.active_ingredient|default:"(sin nombre)" }}</a></td>
+        <td class="ft-pa">{{ fila.doc.active_ingredient }}</td>
+        <td>{% for etiqueta in fila.grupos %}<span class="ft-atc">{{ etiqueta }}</span>{% empty %}<span class="muted">—</span>{% endfor %}</td>
+        <td class="ft-regs">{% for n in fila.registros %}{{ n }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+        <td><span class="badge s-{{ fila.doc.status }}">{{ fila.doc.get_status_display }}</span></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="muted">
+        {% if consulta or grupo_activo %}Sin fichas para este filtro.{% else %}Aún no hay fichas ingeridas. Lánzalas con <code>manage.py ingest_fichas_cima</code>.{% endif %}
+      </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if page.has_other_pages %}
+<div class="pager">
+  {% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">← anterior</a>{% endif %}
+  <span>página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

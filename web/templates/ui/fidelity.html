@@ -1,0 +1,72 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Fidelidad · docsrepo{% endblock %}
+{% block content %}
+
+<h2 style="margin-top:0">Revisor de fidelidad</h2>
+<p class="muted">Cuánto del documento vio cada sección antes de llamar al LLM, en qué estado
+   llegó la conversión, si los números, fechas, nombres y textos de la salida anclan contra el
+   Markdown fuente, y qué secciones del fuente no dejaron rastro en el JSON (capa 3).
+   <strong>Solo informa</strong>: ningún documento se bloquea por estas cifras, y no hay umbrales
+   — se miden con más corpus antes de decidir nada.</p>
+<p class="muted">Se ordena por la <strong>peor sección</strong>, no por la cobertura global: en la
+   pérdida que motivó esto la global era del 100% mientras la sección que perdía contenido
+   recibía el 14%.</p>
+
+<table>
+  <thead>
+    <tr><th>Documento</th><th>Tipo</th><th>Peor sección</th><th>Cobertura global</th>
+        <th>Entrada sin cubrir</th>
+        <th>Encabezados cortos</th><th>Sin clasificar</th><th>Sin anclar</th>
+        <th>Secciones omitidas</th><th>Medido</th></tr>
+  </thead>
+  <tbody>
+    {% for i in informes %}
+      <tr>
+        <td><a href="{% url 'ui:detail' i.document.pk %}">{{ i.document.display_name }}</a></td>
+        <td>{{ i.get_variant_display }}</td>
+        <td>{{ i.min_section_coverage }}</td>
+        <td>{{ i.global_coverage }}</td>
+        <td>{% if i.uncovered_chars %}{{ i.uncovered_chars }} car. ({{ i.uncovered_ratio }}){% else %}—{% endif %}</td>
+        {% if i.report.path == "cima" %}
+          <td colspan="2" class="muted">
+            desde CIMA (nº {{ i.report.registration_number }}) · sin conversión que medir
+            {% if i.report.missing_fields %}
+              <br><span class="error">campos sin segmentar: {{ i.report.missing_fields|join:", " }}</span>
+            {% endif %}
+            {% if i.report.duplicated_fields %}
+              <br><span class="error">texto duplicado:
+                {% for campo, chars in i.report.duplicated_fields.items %}{{ campo }} ({{ chars }} car.){% if not forloop.last %}, {% endif %}{% endfor %}</span>
+            {% endif %}
+          </td>
+          <td class="muted">—</td>
+          <td class="muted">—</td>
+        {% else %}
+          <td>{{ i.report.conversion.short_headings }} / {{ i.report.conversion.headings_total }}</td>
+          <td>{{ i.report.conversion.other_clinical_ratio }}</td>
+          <td>
+            {% with a=i.report.anchoring %}
+            {% if a.error %}
+              <span class="error">error ({{ a.error }})</span>
+            {% elif a.numbers_unanchored or a.dates_unanchored or a.verbatim_unanchored or a.text_unanchored %}
+              <span class="error">{{ a.numbers_unanchored }} nº / {{ a.dates_unanchored }} fechas / {{ a.verbatim_unanchored }} verb / {{ a.text_unanchored }} txt</span>
+            {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            {% with s=i.report.salient %}
+            {% if s.error %}
+              <span class="error">error ({{ s.error }})</span>
+            {% elif s.omitted_sections %}
+              <span class="error">{{ s.omitted_sections|length }} de {{ s.sections|length }}</span>
+            {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+        {% endif %}
+        <td class="muted">{{ i.created_at|date:"Y-m-d H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="10" class="muted">Aún no hay informes: se generan al procesar un PDF a JSON.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

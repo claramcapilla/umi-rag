@@ -1,0 +1,238 @@
+{% extends "docsrepo_base.html" %}
+{% load especialidades %}
+{% block title %}{% if active_collection %}{{ active_collection.name }} · {% endif %}docsrepo{% endblock %}
+{% block content %}
+
+{% if not active_collection %}
+{# ---------- Inicio: bienvenida + especialidades ---------- #}
+<div class="home-head">
+  <section class="hero">
+    <h1>Gestión documental del RAG médico</h1>
+    <p>Prepara y organiza la literatura clínica que alimenta a los chatbots de Código Rojo:
+       elige una especialidad para subir sus PDFs, convertirlos a conocimiento indexado y seguir su estado.</p>
+  </section>
+
+  <div class="home-head__actions">
+    <div class="create-card home-head__create">
+      <h4>Nueva especialidad</h4>
+      <p class="muted" style="margin:0 0 10px;font-size:12px">No necesitas tener documentos subidos.</p>
+      <form method="post" action="{% url 'ui:create_collection' %}" style="display:flex;gap:10px">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="p. ej. Cardiología" required>
+        <button type="submit">Crear</button>
+      </form>
+    </div>
+
+    {% comment %}El widget también va aquí: soltar una carpeta de especialidad crea la
+    especialidad, así que exigir estar dentro de una para poder subirla sería circular.{% endcomment %}
+    {% include "ui/_upload.html" %}
+  </div>
+</div>
+
+<h2 class="section-title">Especialidades</h2>
+{% if specialties %}
+  <div class="spec-grid">
+    {% for c in specialties %}
+      <a class="spec-card" href="?collection={{ c.id }}">
+        <span class="ico">{{ c.name|especialidad_icono }}</span>
+        <span class="nm">{{ c.name }}</span>
+        <span class="meta">{{ c.subtree_count }} documento{{ c.subtree_count|pluralize }}</span>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty">
+    <p style="font-size:16px;color:var(--fg)">Aún no hay especialidades</p>
+    <p>Crea la primera para empezar a subir documentos.</p>
+  </div>
+{% endif %}
+
+{% else %}
+{# ---------- Dentro de una especialidad: raíl + contenido ---------- #}
+<div class="lib">
+  <aside class="lib-rail">
+    <p class="rl">Especialidades</p>
+    {% for s in specialties %}
+      {% if s.children.all %}
+        <details class="rail-grp" {% if active_collection.id == s.id or active_collection.parent_id == s.id %}open{% endif %}>
+          <summary>
+            <a href="?collection={{ s.id }}" class="{% if active_collection.id == s.id %}on{% endif %}">
+              <span>{{ s.name|especialidad_icono }}</span><span class="nm">{{ s.name }}</span><span class="ct">{{ s.subtree_count }}</span>
+            </a>
+          </summary>
+          <div class="rail-subs">
+            {% for c in s.children.all %}
+              <a href="?collection={{ c.id }}" class="rail-sub {% if active_collection.id == c.id %}on{% endif %}">
+                <span class="nm">{{ c.name }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <a href="?collection={{ s.id }}"
+           class="{% if active_collection.id == s.id %}on{% endif %}">
+          <span>{{ s.name|especialidad_icono }}</span><span class="nm">{{ s.name }}</span><span class="ct">{{ s.subtree_count }}</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </aside>
+
+  <main class="lib-main">
+    <div class="spec-head">
+      <div class="spec-head__title">
+        <p class="muted" style="margin:0 0 4px">
+          <a href="{% url 'ui:library' %}">Especialidades</a>
+          {% if active_collection.parent %} · <a href="?collection={{ active_collection.parent.id }}">{{ active_collection.parent.name }}</a>{% endif %}
+        </p>
+        <h2 style="margin:0 0 3px">
+          {% if active_collection.is_specialty_root %}{{ active_collection.name|especialidad_icono }}{% else %}📁{% endif %} {{ active_collection.name }}
+        </h2>
+      </div>
+      {% include "ui/_upload.html" %}
+    </div>
+
+    {% if prompt_html or norms_pretty %}
+    <div class="sp-panels">
+      {% if prompt_html %}
+      <details class="sp-panel">
+        <summary>🧭 System prompt</summary>
+        <div class="mdview">{{ prompt_html|safe }}</div>
+      </details>
+      {% endif %}
+      {% if norms_pretty %}
+      <details class="sp-panel">
+        <summary>📐 Normas</summary>
+        <pre class="norms-json">{{ norms_pretty }}</pre>
+      </details>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if children %}
+    <h2 class="section-title">Subespecialidades</h2>
+    <div class="spec-grid">
+      {% for c in children %}
+        <a class="spec-card" href="?collection={{ c.id }}">
+          <span class="ico">📁</span>
+          <span class="nm">{{ c.name }}</span>
+          <span class="meta">{{ c.doc_count }} documento{{ c.doc_count|pluralize }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if batch %}
+    <div class="progress-panel" id="progress-panel"
+         data-ids="{% for d in batch %}{{ d.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
+         data-url="{% url 'ui:upload_progress' %}">
+      <h3>Progreso de la subida ({{ batch|length }})</h3>
+      <div id="progress-rows">
+        {% for d in batch %}
+          <div class="prow" data-id="{{ d.pk }}">
+            <span class="pname">{{ d.display_name }}</span>
+            <span class="badge s-{{ d.status }}">{{ d.get_status_display }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const panel = document.getElementById("progress-panel");
+        if (!panel) return;
+        const ids = panel.dataset.ids;
+        const url = panel.dataset.url;
+        let polls = 0;
+        const badgeClass = (s) => "badge s-" + s;
+        async function tick() {
+          polls++;
+          try {
+            const r = await fetch(url + "?ids=" + encodeURIComponent(ids));
+            const data = await r.json();
+            let allDone = true;
+            for (const d of data.docs) {
+              const row = panel.querySelector('.prow[data-id="' + d.id + '"] .badge');
+              if (row) { row.textContent = d.label; row.className = badgeClass(d.status); }
+              if (!d.done) allDone = false;
+            }
+            if (allDone || polls > 40) return;  // corta tras ~2 min o cuando todo esté en estado final
+          } catch (e) { return; }
+          setTimeout(tick, 3000);
+        }
+        setTimeout(tick, 3000);
+      })();
+    </script>
+    {% endif %}
+
+    {% if docs or active_status or active_tag or active_doc_type or not children %}
+    {% if status_metrics %}
+    <div class="metrics">
+      {% for m in status_metrics %}
+        <div class="metric" style="--c:{{ m.color }}">
+          <div class="n">{{ m.n }}</div>
+          <div class="l">{{ m.label }}</div>
+        </div>
+      {% endfor %}
+      {% for m in type_metrics %}
+        <a class="metric metric-link {% if active_doc_type == m.value %}on{% endif %}" style="--c:{{ m.color }}"
+           href="?collection={{ active_collection.id }}{% if active_doc_type != m.value %}&amp;doc_type={{ m.value }}{% endif %}{% if active_tag %}&amp;tag={{ active_tag }}{% endif %}">
+          <div class="n">{{ m.n }}</div>
+          <div class="l">{{ m.label }}</div>
+        </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if active_doc_type %}
+    <p class="muted" style="margin:0 0 12px;font-size:13px">
+      Filtrado por <strong>{% for m in type_metrics %}{% if m.value == active_doc_type %}{{ m.label }}{% endif %}{% endfor %}</strong>
+      · <a href="?collection={{ active_collection.id }}{% if active_tag %}&amp;tag={{ active_tag }}{% endif %}">quitar filtro</a>
+    </p>
+    {% endif %}
+
+    {% if tags %}
+    <div class="chips">
+      <a class="chip {% if not active_tag %}active{% endif %}" href="?collection={{ active_collection.id }}{% if active_doc_type %}&amp;doc_type={{ active_doc_type }}{% endif %}">Todas las etiquetas</a>
+      {% for t in tags %}
+        <a class="chip {% if active_tag == t.id|stringformat:'s' %}active{% endif %}" href="?collection={{ active_collection.id }}&amp;tag={{ t.id }}{% if active_doc_type %}&amp;doc_type={{ active_doc_type }}{% endif %}">🏷 {{ t.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <table>
+      <thead><tr><th>Título</th><th>Autores</th><th>DOI</th><th>JSON</th><th>Subido</th></tr></thead>
+      <tbody>
+        {% for d in docs %}
+          <tr>
+            <td>
+              <span class="doc-title">
+                {% comment %}Antes de procesar, doc_type es la detección rápida por regex (provisional
+                y floja con guías); el tipo definitivo lo fija el router LLM al generar el JSON. Se
+                muestra la etiqueta cuando hay JSON —mismo criterio que la columna JSON—, porque tener
+                JSON implica que el router ya fijó el tipo, aunque el documento se esté regenerando.{% endcomment %}
+                {% if d.json_file %}
+                  {% if d.doc_type == 'guia_clinica' %}<span class="ty">GUÍA</span>
+                  {% elif d.doc_type == 'paper' %}<span class="ty">PAPER</span>
+                  {% elif d.doc_type == 'ficha_tecnica' %}<span class="ty">FICHA</span>{% endif %}
+                {% endif %}
+                <a href="{% url 'ui:detail' d.pk %}">{{ d }}</a>
+              </span>
+            </td>
+            <td>{% if d.authors %}{{ d.authors.0 }}{% if d.authors|length > 1 %} <span class="muted">et al.</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td class="mono">{% if d.doi %}<a href="https://doi.org/{{ d.doi }}" target="_blank" rel="noopener">{{ d.doi }}</a>{% else %}—{% endif %}</td>
+            <td class="json-cell">
+              {% if d.json_file %}<span class="json-yes" title="JSON generado">✓</span>
+              {% else %}<span class="json-no" title="Sin JSON">✗</span>{% endif %}
+            </td>
+            <td class="mono">{{ d.uploaded_at|date:"d/m/Y H:i" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="muted">Aún no hay documentos aquí. Sube un PDF o una carpeta para empezar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </main>
+</div>
+{% endif %}
+{% endblock %}

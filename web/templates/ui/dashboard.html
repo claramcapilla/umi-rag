@@ -1,0 +1,235 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Conversión del corpus · docsrepo{% endblock %}
+{% block content %}
+
+<style>
+  .trk-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin:0 0 4px; }
+  .trk-head h2 { margin:0; }
+  .live { display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:13px; }
+  .live::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--st-idx);
+    box-shadow:0 0 0 0 color-mix(in srgb,var(--st-idx) 60%,transparent); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--st-idx) 55%,transparent);}
+    70%{box-shadow:0 0 0 7px transparent;} 100%{box-shadow:0 0 0 0 transparent;} }
+  @media (prefers-reduced-motion:reduce){ .live::before{ animation:none; } }
+
+  .bar { height:14px; border-radius:var(--r-full); background:var(--bg-3); overflow:hidden; }
+  .bar > i.done { background:var(--st-idx); }
+  .bar > i { display:block; height:100%; background:var(--st-json); border-radius:var(--r-full);
+    transition:width .5s ease; }
+  .trk-hero { background:var(--bg); border:1px solid var(--line); border-radius:var(--r-md);
+    padding:18px 20px; box-shadow:var(--sh-sm); margin:14px 0 16px; }
+  .trk-hero .big { height:20px; }
+  .trk-hero .cap { display:flex; justify-content:space-between; align-items:baseline; margin:0 0 10px; gap:12px; flex-wrap:wrap; }
+  .trk-hero .cap .pct { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .trk-hero .cap .count { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .trk-hero .rate { color:var(--muted); font-size:13px; margin:10px 0 0; font-variant-numeric:tabular-nums; }
+
+  .tally { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 4px; }
+  .tally .t { background:var(--bg); border:1px solid var(--line); border-radius:var(--r-md);
+    padding:12px 16px; min-width:100px; box-shadow:var(--sh-sm); border-left:3px solid var(--c,var(--muted)); }
+  .tally .t .n { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tally .t .l { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .t-json{--c:var(--st-json);} .t-proc{--c:var(--st-run);} .t-pend{--c:var(--st-up);}
+  .t-fail{--c:var(--st-fail);} .t-total{--c:var(--muted-2);} .t-wd{--c:var(--muted);}
+
+  .cima-avisos { background:var(--bg); border:1px solid var(--line); border-left:3px solid var(--st-run);
+    border-radius:var(--r-md); padding:14px 18px; box-shadow:var(--sh-sm); margin:14px 0 16px; }
+  .cima-avisos h3 { margin:0 0 6px; }
+  .cima-avisos ul { list-style:none; margin:8px 0; padding:0; }
+  .cima-avisos li { display:flex; gap:10px; align-items:baseline; padding:4px 0; border-top:1px solid var(--line); }
+  .cima-avisos li:first-child { border-top:0; }
+  .cima-avisos .reg { font-family:var(--font-mono,monospace); font-size:12px; color:var(--muted-2); }
+  .cima-avisos .acciones { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+
+  .inproc { margin:20px 0 4px; }
+  .inproc h3 { margin:0 0 10px; }
+  .ip { display:grid; grid-template-columns:minmax(0,1fr) 210px; align-items:center; gap:6px 16px;
+    padding:11px 14px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--bg);
+    box-shadow:var(--sh-sm); margin-bottom:8px; }
+  .ip .ip-t { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ip .ip-l { grid-column:1; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ip .cell-bar { grid-column:2; grid-row:1 / span 2; }
+  td .cell-bar, .ip .cell-bar { display:flex; align-items:center; gap:10px; }
+  td .cell-bar .bar, .ip .cell-bar .bar { flex:1; min-width:80px; }
+  td .cell-bar .p, .ip .cell-bar .p { width:44px; text-align:right; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .z { color:var(--muted-2); }
+</style>
+
+<div class="trk-head">
+  <h2>Conversión del corpus</h2>
+  <span class="live">en vivo · <span id="trk-clock">{{ updated_at }}</span></span>
+</div>
+
+{% if avisos_cima_total or ultima_sincronizacion or fichas_por_retirar %}
+<div class="cima-avisos">
+  <h3 class="section-title">Cambios en CIMA</h3>
+  {% if ultima_sincronizacion %}
+    <p class="muted" style="margin:0">
+      Última sincronización: {{ ultima_sincronizacion.iniciada_en|date:"d/m/Y H:i" }} ·
+      {{ ultima_sincronizacion.get_estado_display }}{% if ultima_sincronizacion.carga_inicial %} (carga inicial){% endif %}
+      {% for etiqueta, total in resumen_sincronizacion %} · {{ etiqueta }}: {{ total }}{% endfor %}
+      · <a href="{% url 'ui:cima_sync' %}">ver registro</a>
+    </p>
+  {% endif %}
+  {% if fichas_por_retirar %}
+    <p><span class="badge s-FAILED">{{ fichas_por_retirar }}</span> ficha(s) sin ningún registro vigente
+       siguen en Chroma a la espera de salir.</p>
+  {% endif %}
+  {% if errores_cima %}
+    <p><span class="badge s-FAILED">{{ errores_cima }}</span> registro(s) de CIMA con error sin resolver:
+       se reintentan en la próxima sincronización.</p>
+  {% endif %}
+  {% if avisos_cima_total %}
+    <form method="post" action="{% url 'ui:cima_sync_visto' %}">
+      {% csrf_token %}
+      <ul>
+        {% for e in avisos_cima %}
+          <li>
+            <input type="checkbox" name="evento" value="{{ e.pk }}" aria-label="Marcar {{ e.nregistro }} como visto">
+            <span class="badge">{{ e.get_tipo_display }}</span>
+            {% if e.document %}<a href="{% url 'ui:detail' e.document.pk %}">{{ e.nombre|default:e.nregistro }}</a>{% else %}{{ e.nombre|default:e.nregistro }}{% endif %}
+            <span class="reg">{{ e.nregistro }}</span>
+            {% if e.detalle %}<span class="muted">{{ e.detalle }}</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="acciones">
+        <button type="submit">Marcar seleccionados como vistos</button>
+        <button type="submit" name="todos" value="1">Marcar los {{ avisos_cima_total }} como vistos</button>
+        {% if avisos_cima_total > avisos_cima|length %}<span class="muted">Se muestran {{ avisos_cima|length }} de {{ avisos_cima_total }}.</span>{% endif %}
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="trk-hero">
+  <div class="cap">
+    <span><span class="pct" id="h-pct">{{ totals.pct }}</span>% convertido</span>
+    <span class="count"><span id="h-done">{{ totals.done }}</span> / <span id="h-total">{{ totals.total }}</span> documentos</span>
+  </div>
+  <div class="bar big"><i id="h-bar" style="width:{{ totals.pct }}%"></i></div>
+  <p class="rate" id="h-rate">
+    {% if per_hour %}Ritmo: ~{{ per_hour }} docs/h{% if eta_hours %} · ETA ~{{ eta_hours }} h{% endif %}{% else %}Sin conversiones en la última hora.{% endif %}
+  </p>
+</div>
+
+<div class="tally">
+  <div class="t t-total"><div class="n" id="c-total">{{ totals.total }}</div><div class="l">Total</div></div>
+  <div class="t t-json"><div class="n" id="c-done">{{ totals.done }}</div><div class="l">Convertidos</div></div>
+  <div class="t t-proc"><div class="n" id="c-proc">{{ totals.processing }}</div><div class="l">Procesando</div></div>
+  <div class="t t-pend"><div class="n" id="c-pend">{{ totals.pending }}</div><div class="l">Pendientes</div></div>
+  <div class="t t-fail"><div class="n" id="c-fail">{{ totals.failed }}</div><div class="l">Fallidos</div></div>
+  <div class="t t-wd"><div class="n" id="c-wd">{{ totals.withdrawn }}</div><div class="l">Retirados</div></div>
+</div>
+
+<div class="inproc" id="inproc" {% if not processing_docs %}hidden{% endif %}>
+  <h3 class="section-title">En proceso ahora</h3>
+  <div id="inproc-rows">
+    {% for p in processing_docs %}
+      <div class="ip">
+        <div class="ip-t" title="{{ p.title }}">{{ p.title }}</div>
+        <div class="cell-bar"><div class="bar"><i style="width:{{ p.pct }}%"></i></div><span class="p">{{ p.done }}/{{ p.total }}</span></div>
+        <div class="ip-l">{{ p.label|default:"iniciando…" }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<form method="post" action="{% url 'ui:retry_failed' %}" style="margin:14px 0 16px" id="retry-all" {% if not totals.failed %}hidden{% endif %}>
+  {% csrf_token %}
+  <button type="submit">Reintentar todos los fallidos (<span id="c-fail2">{{ totals.failed }}</span>)</button>
+</form>
+
+<table>
+  <thead>
+    <tr><th>Especialidad</th><th style="width:34%">Progreso</th><th class="num">Convertidos</th>
+        <th class="num">Proc.</th><th class="num">Pend.</th><th class="num">Fallidos</th><th></th></tr>
+  </thead>
+  <tbody id="trk-rows">
+    {% for r in rows %}
+      <tr>
+        <td>{% if r.key %}{{ r.specialty }}{% else %}<span class="muted">{{ r.specialty }}</span>{% endif %}</td>
+        <td><div class="cell-bar"><div class="bar"><i class="{% if r.total and r.done == r.total %}done{% endif %}" style="width:{{ r.pct }}%"></i></div><span class="p">{{ r.pct }}%</span></div></td>
+        <td class="num">{{ r.done }} / {{ r.total }}</td>
+        <td class="num">{% if r.processing %}{{ r.processing }}{% else %}<span class="z">0</span>{% endif %}</td>
+        <td class="num">{% if r.pending %}{{ r.pending }}{% else %}<span class="z">0</span>{% endif %}</td>
+        <td class="num">{% if r.failed %}<span class="badge s-FAILED">{{ r.failed }}</span>{% else %}<span class="z">0</span>{% endif %}</td>
+        <td>
+          {% if r.failed and r.key %}
+          <form method="post" action="{% url 'ui:retry_failed' %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="specialty" value="{{ r.key }}">
+            <button type="submit" style="padding:5px 12px;font-size:13px">Reintentar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="muted">Aún no hay documentos.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  (function () {
+    const url = "{% url 'ui:dashboard_data' %}";
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const num = (n, muted) => n ? n : '<span class="z">0</span>';
+
+    function rowHTML(r) {
+      const name = r.key ? esc(r.specialty) : `<span class="muted">${esc(r.specialty)}</span>`;
+      const retry = (r.failed && r.key)
+        ? `<form method="post" action="{% url 'ui:retry_failed' %}" style="margin:0">`
+          + `{% csrf_token %}<input type="hidden" name="specialty" value="${esc(r.key)}">`
+          + `<button type="submit" style="padding:5px 12px;font-size:13px">Reintentar</button></form>`
+        : '';
+      const failed = r.failed ? `<span class="badge s-FAILED">${r.failed}</span>` : '<span class="z">0</span>';
+      return `<tr><td>${name}</td>`
+        + `<td><div class="cell-bar"><div class="bar"><i class="${r.total && r.done === r.total ? 'done' : ''}" style="width:${r.pct}%"></i></div><span class="p">${r.pct}%</span></div></td>`
+        + `<td class="num">${r.done} / ${r.total}</td>`
+        + `<td class="num">${num(r.processing)}</td>`
+        + `<td class="num">${num(r.pending)}</td>`
+        + `<td class="num">${failed}</td>`
+        + `<td>${retry}</td></tr>`;
+    }
+
+    function procHTML(p) {
+      const label = p.label ? esc(p.label) : "iniciando…";
+      const cuenta = p.total ? `${p.done}/${p.total}` : "—";
+      return `<div class="ip"><div class="ip-t" title="${esc(p.title)}">${esc(p.title)}</div>`
+        + `<div class="cell-bar"><div class="bar"><i style="width:${p.pct}%"></i></div><span class="p">${cuenta}</span></div>`
+        + `<div class="ip-l">${label}</div></div>`;
+    }
+
+    async function tick() {
+      try {
+        const r = await fetch(url, {headers: {"X-Requested-With": "fetch"}});
+        const d = await r.json();
+        const t = d.totals;
+        $("h-pct").textContent = t.pct; $("h-done").textContent = t.done; $("h-total").textContent = t.total;
+        $("h-bar").style.width = t.pct + "%";
+        $("c-total").textContent = t.total; $("c-done").textContent = t.done;
+        $("c-proc").textContent = t.processing; $("c-pend").textContent = t.pending; $("c-fail").textContent = t.failed;
+        $("c-wd").textContent = t.withdrawn;
+        $("h-rate").textContent = d.per_hour
+          ? `Ritmo: ~${d.per_hour} docs/h` + (d.eta_hours ? ` · ETA ~${d.eta_hours} h` : "")
+          : "Sin conversiones en la última hora.";
+        $("trk-clock").textContent = d.updated_at;
+        const retryAll = $("retry-all");
+        retryAll.hidden = !t.failed;
+        if (t.failed) $("c-fail2").textContent = t.failed;
+        if (d.rows && d.rows.length) $("trk-rows").innerHTML = d.rows.map(rowHTML).join("");
+        const proc = d.processing_docs || [];
+        const inproc = $("inproc");
+        inproc.hidden = proc.length === 0;
+        if (proc.length) $("inproc-rows").innerHTML = proc.map(procHTML).join("");
+      } catch (e) { /* reintenta en el siguiente tick */ }
+      setTimeout(tick, 5000);
+    }
+    setTimeout(tick, 5000);
+  })();
+</script>
+{% endblock %}

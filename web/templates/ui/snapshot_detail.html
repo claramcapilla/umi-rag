@@ -1,0 +1,35 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}{{ snap.label }} · Snapshot{% endblock %}
+{% block content %}
+
+<p><a href="{% url 'ui:timeline' %}">← Snapshots</a></p>
+<h2 style="margin-top:0">Estado del corpus · {{ snap.label }}</h2>
+
+<div class="cards">
+  <div class="card"><div class="n">{{ snap.document_count }}</div><div class="l">Documentos</div></div>
+  <div class="card"><div class="n" style="font-size:15px">{{ snap.created_at|date:"d/m/Y H:i" }}</div><div class="l">Fecha</div></div>
+  <div class="card"><div class="n" style="font-size:13px">{{ snap.config_version|default:"—" }}</div><div class="l">Config</div></div>
+</div>
+
+<p class="muted">Hash del corpus: <span style="font-family:monospace">{{ snap.corpus_hash }}</span>
+  {% if snap.backup_ref %} · Backup: {{ snap.backup_ref }}{% endif %}</p>
+
+<table>
+  <thead>
+    <tr><th>SHA-256</th><th>Estado</th><th>Tipo</th><th>Chunks</th><th>Colecciones</th></tr>
+  </thead>
+  <tbody>
+    {% for e in snap.manifest %}
+    <tr>
+      <td class="muted" style="font-family:monospace">{{ e.sha256|slice:":12" }}</td>
+      <td><span class="badge s-{{ e.status }}">{{ e.status }}</span>{% if e.error_stage %} <span class="muted">en {{ e.error_stage }}</span>{% endif %}</td>
+      <td class="muted">{{ e.doc_type|default:"—" }}</td>
+      <td>{{ e.chunk_count }}</td>
+      <td class="muted">{{ e.collections|join:", "|default:"—" }}</td>
+    </tr>
+    {% empty %}
+      <tr><td colspan="5" class="muted">Snapshot vacío.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

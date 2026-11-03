@@ -1,0 +1,330 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}{{ doc }} · docsrepo{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+
+<p class="muted">
+  {% if back_collection %}
+    <a href="{% url 'ui:library' %}">Especialidades</a>
+    {% if back_collection.parent %} · <a href="{% url 'ui:library' %}?collection={{ back_collection.parent.id }}">{{ back_collection.parent.name }}</a>{% endif %}
+    · <a href="{% url 'ui:library' %}?collection={{ back_collection.id }}">← {{ back_collection.name }}</a>
+  {% else %}
+    <a href="{% url 'ui:library' %}">← Biblioteca</a>
+  {% endif %}
+</p>
+
+<div class="row detail">
+  <section class="pdfcol">
+    <h2>{{ doc }}</h2>
+    <p><span class="badge s-{{ doc.status }}" id="dp-badge">{{ doc.get_status_display }}</span>
+       {% if doc.error_stage %}<span class="muted"> · fallo en {{ doc.get_error_stage_display }}</span>{% endif %}</p>
+
+    {% if doc.status == 'PARSING' or doc.status == 'PARSED' or doc.status == 'INDEXING' %}
+    <style>
+      .docprog { display:flex; flex-direction:column; gap:6px; max-width:520px; margin:0 0 16px; }
+      .docprog .track { height:14px; border-radius:999px; background:var(--bg-3); overflow:hidden; }
+      .docprog .track > i { display:block; height:100%; background:var(--st-run); border-radius:999px; transition:width .5s ease; }
+      .docprog .meta { display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); }
+    </style>
+    <div class="docprog" id="docprog" data-url="{% url 'ui:doc_progress' doc.pk %}">
+      <div class="track"><i id="dp-bar" style="width:{% if doc.progress_total %}{% widthratio doc.progress_done doc.progress_total 100 %}{% else %}0{% endif %}%"></i></div>
+      <div class="meta">
+        <span id="dp-label">{{ doc.progress_label|default:"iniciando…" }}</span>
+        <span id="dp-count">{% if doc.progress_total %}{{ doc.progress_done }}/{{ doc.progress_total }} secciones{% endif %}</span>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var box = document.getElementById("docprog");
+        if (!box) return;
+        var url = box.dataset.url;
+        function tick() {
+          fetch(url, {headers: {"X-Requested-With": "fetch"}}).then(function (r) { return r.json(); }).then(function (d) {
+            document.getElementById("dp-bar").style.width = d.pct + "%";
+            document.getElementById("dp-label").textContent = d.label || "iniciando…";
+            document.getElementById("dp-count").textContent = d.total ? (d.done + "/" + d.total + " secciones") : "";
+            var badge = document.getElementById("dp-badge");
+            if (badge) { badge.textContent = d.status_display; badge.className = "badge s-" + d.status; }
+            // Cuando el documento sale de un estado de proceso, recargar para mostrar el resultado.
+            if (d.status !== "PARSING" && d.status !== "PARSED" && d.status !== "INDEXING") { location.reload(); return; }
+            setTimeout(tick, 3000);
+          }).catch(function () { setTimeout(tick, 5000); });
+        }
+        setTimeout(tick, 3000);
+      })();
+    </script>
+    {% endif %}
+
+    {% if chapters %}
+    <section class="chapters">
+      <h2>Capítulos ({{ chapters|length }})</h2>
+      <p class="muted">Guía dividida por su tamaño; cada capítulo se convierte por separado y su cita apunta a esta guía.</p>
+      <ul class="chapterlist">
+        {% for cap in chapters %}
+        <li>
+          <a href="{% url 'ui:detail' cap.pk %}">{{ cap.chapter_heading|default:cap.pk }}</a>
+          <span class="badge s-{{ cap.status }}">{{ cap.get_status_display }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if doc.pdf_file or clinical_md or clinical_json %}
+    <div class="viewer" data-viewer>
+      <div class="viewtabs" role="tablist">
+        {% if doc.pdf_file %}<button type="button" class="viewtab" role="tab" data-tab="pdf" aria-selected="{% if default_view == 'pdf' %}true{% else %}false{% endif %}">PDF</button>{% endif %}
+        {% if clinical_md %}<button type="button" class="viewtab" role="tab" data-tab="md" aria-selected="{% if default_view == 'md' %}true{% else %}false{% endif %}">MD</button>{% endif %}
+        {% if clinical_json %}<button type="button" class="viewtab" role="tab" data-tab="json" aria-selected="{% if default_view == 'json' %}true{% else %}false{% endif %}">JSON generado</button>{% endif %}
+        <span class="grow"></span>
+        <a class="viewaction" data-when="pdf" href="{% url 'ui:pdf' doc.pk %}" target="_blank" rel="noopener" {% if default_view != 'pdf' %}hidden{% endif %}>Abrir en pestaña nueva ↗</a>
+        {% if clinical_md %}<a class="viewaction" data-when="md" href="{% url 'ui:md' doc.pk %}" target="_blank" rel="noopener" {% if default_view != 'md' %}hidden{% endif %}>Ver crudo ↗</a>{% endif %}
+        {% if clinical_json %}<button type="button" class="viewaction copybtn" data-when="json" data-copy-json {% if default_view != 'json' %}hidden{% endif %}>Copiar</button>{% endif %}
+      </div>
+
+      {% if doc.pdf_file %}
+      <div class="viewpanel" data-panel="pdf" {% if default_view != 'pdf' %}hidden{% endif %}>
+        <iframe class="pdf" src="{% url 'ui:pdf' doc.pk %}" title="PDF de {{ doc }}"></iframe>
+      </div>
+      {% endif %}
+
+      {% if clinical_md %}
+      <div class="viewpanel" data-panel="md" {% if default_view != 'md' %}hidden{% endif %}>
+        <div class="mdview">{{ clinical_md|safe }}</div>
+      </div>
+      {% endif %}
+
+      {% if clinical_json %}
+      <div class="viewpanel" data-panel="json" {% if default_view != 'json' %}hidden{% endif %}>
+        <pre id="clinical-json">{{ clinical_json }}</pre>
+      </div>
+      {% endif %}
+    </div>
+    <script>
+      (function () {
+        var root = document.querySelector("[data-viewer]");
+        if (!root) return;
+        var tabs = root.querySelectorAll(".viewtab");
+        var panels = root.querySelectorAll(".viewpanel");
+        var actions = root.querySelectorAll(".viewaction");
+        function show(name) {
+          tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.tab === name); });
+          panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+          actions.forEach(function (a) { a.hidden = a.dataset.when !== name; });
+        }
+        tabs.forEach(function (t) { t.addEventListener("click", function () { show(t.dataset.tab); }); });
+
+        var copy = root.querySelector("[data-copy-json]");
+        var pre = document.getElementById("clinical-json");
+        if (copy && pre) {
+          copy.addEventListener("click", function () {
+            navigator.clipboard.writeText(pre.textContent).then(function () {
+              var t = copy.textContent; copy.textContent = "Copiado ✓";
+              setTimeout(function () { copy.textContent = t; }, 1500);
+            });
+          });
+        }
+      })();
+    </script>
+    {% elif doc.json_file %}
+    <p class="muted" style="margin-top:14px">No se pudo leer el JSON generado para mostrarlo aquí.
+       Prueba a <a href="{% url 'ui:json' doc.pk %}">descargarlo</a>.</p>
+    {% endif %}
+
+    {% if fidelidad %}
+    <h3 style="margin-top:20px">Fidelidad de la extracción</h3>
+    {% if fidelidad.report.path == "cima" %}
+      <p class="muted" style="font-size:13px">Qué parte de la ficha que sirve CIMA acabó en algún
+         campo del esquema. Medido el {{ fidelidad.created_at|date:"Y-m-d H:i" }} sobre
+         {{ fidelidad.report.doc_chars }} caracteres, para el nº de registro
+         {{ fidelidad.report.registration_number }}. No hay conversión que medir: el registro sirve
+         la ficha ya segmentada. Informativo: no bloquea nada.</p>
+      {% if fidelidad.report.missing_fields %}
+        <p class="error" style="font-size:13px">CIMA no segmentó estos campos:
+           {{ fidelidad.report.missing_fields|join:", " }}. El documento se indexa igual —no hay
+           umbrales todavía— pero eso es contenido que no está.</p>
+      {% endif %}
+      {% if fidelidad.report.duplicated_fields %}
+        <p class="error" style="font-size:13px">Estos campos se compusieron de partes que se
+           contienen entre sí, así que llevan texto archivado dos veces:
+           {% for campo, chars in fidelidad.report.duplicated_fields.items %}{{ campo }} ({{ chars }} car.){% if not forloop.last %}, {% endif %}{% endfor %}.
+           Es la rotura que duplicó la posología en 3 de las 5 fichas del corpus congelado, y
+           entonces no dio ningún error.</p>
+      {% endif %}
+      {% if fidelidad.report.discarded_sections %}
+        <p class="muted" style="font-size:13px">Secciones servidas que el esquema no recoge:
+           {% for d in fidelidad.report.discarded_sections %}{{ d.section }} ({{ d.chars }} car.){% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted" style="font-size:13px">Qué parte del documento recibió cada sección antes de
+         llamar al LLM. Medido el {{ fidelidad.created_at|date:"Y-m-d H:i" }} sobre
+         {{ fidelidad.report.doc_chars }} caracteres de Markdown. Informativo: no bloquea nada.</p>
+      {% if fidelidad.uncovered_chars %}
+        <p class="error" style="font-size:13px">⚠ {{ fidelidad.uncovered_chars }} caracteres
+           ({{ fidelidad.uncovered_ratio }} del documento) no llegaron a ninguna sección: el
+           documento no cabe en la ventana del modelo y se indexó incompleto. No bloquea —el revisor
+           informa— pero es contenido que no está.</p>
+      {% endif %}
+    {% endif %}
+    <table>
+      <thead><tr><th>Sección</th><th>Cobertura</th><th>Caracteres vistos</th><th>Truncado</th></tr></thead>
+      <tbody>
+        {% for clave, s in fidelidad.report.coverage.sections.items %}
+          <tr>
+            <td>{{ clave }}</td>
+            <td>{{ s.coverage }}</td>
+            <td>{{ s.covered_doc_chars }}</td>
+            <td>{% if s.truncated_chars %}{{ s.truncated_chars }}{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:13px">Unión global: {{ fidelidad.report.coverage.global_coverage }}
+       ({{ fidelidad.report.coverage.uncovered_chars }} caracteres que no vio ninguna sección).
+       {% if fidelidad.report.conversion %}Encabezados de ≤2 caracteres:
+       {{ fidelidad.report.conversion.short_headings }} de
+       {{ fidelidad.report.conversion.headings_total }}.{% endif %}</p>
+    {% if fidelidad.report.anchoring %}
+      {% with a=fidelidad.report.anchoring %}
+      <h4 style="margin-bottom:4px">Anclaje de la salida (capa 2)</h4>
+      {% if a.error %}
+      <p class="error" style="font-size:13px">El anclaje no se pudo calcular ({{ a.error }}); el
+         documento se procesó igual —el revisor informa, no bloquea—.</p>
+      {% else %}
+      <p class="muted" style="font-size:13px">Cada número, fecha, nombre verbatim (fármaco,
+         biomarcador, escala) y texto de un campo extraído del documento debe apoyarse en el
+         Markdown fuente. {{ a.checked_fields }} campos revisados: {{ a.numbers_total }} números,
+         {{ a.dates_total }} fechas, {{ a.verbatim_checked }} nombres verbatim,
+         {{ a.text_checked }} textos. Informativo, sin veredicto: un valor derivado (un porcentaje
+         calculado, una conversión de unidad) o una paráfrasis con sinónimos puede no estar literal
+         en el fuente.</p>
+      {% if a.unanchored_numbers or a.unanchored_dates or a.unanchored_verbatim or a.unanchored_text %}
+        <table>
+          <thead><tr><th>Campo</th><th>Valor sin anclar</th><th>Tipo</th></tr></thead>
+          <tbody>
+            {% for u in a.unanchored_verbatim %}
+              <tr><td>{{ u.field }}</td><td>{{ u.value }}</td><td class="muted">verbatim</td></tr>
+            {% endfor %}
+            {% for u in a.unanchored_numbers %}
+              <tr><td>{{ u.field }}</td><td>{{ u.value }}</td><td class="muted">número</td></tr>
+            {% endfor %}
+            {% for u in a.unanchored_dates %}
+              <tr><td>{{ u.field }}</td><td>{{ u.value }}</td><td class="muted">fecha</td></tr>
+            {% endfor %}
+            {% for u in a.unanchored_text %}
+              <tr><td>{{ u.field }}</td><td>{{ u.value }}</td><td class="muted">paráfrasis</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted" style="font-size:13px">Todo ancla contra el fuente.</p>
+      {% endif %}
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+    {% if fidelidad.report.salient %}
+      {% with s=fidelidad.report.salient %}
+      <h4 style="margin-bottom:4px">Recuperación de lo saliente (capa 3)</h4>
+      {% if s.error %}
+      <p class="error" style="font-size:13px">La capa 3 no se pudo calcular ({{ s.error }}); el
+         documento se procesó igual —el revisor informa, no bloquea—.</p>
+      {% else %}
+      <p class="muted" style="font-size:13px">Para cada sección del fuente, si sus
+         {{ s.salient_terms_per_section }} términos más raros llegaron a algún campo extraído del
+         documento. Es presencia concreta, no recuento, así que la varianza entre ejecuciones no la
+         mueve. Una sección omitida es la firma de las pérdidas que se han pagado cuatro veces: la
+         bibliografía y los agradecimientos se descuentan porque no son contenido a recuperar.</p>
+      {% if s.omitted_sections %}
+        <p class="error" style="font-size:13px">⚠ {{ s.omitted_sections|length }} de
+           {{ s.sections|length }} secciones no dejaron ningún término en el JSON: contenido que el
+           documento discute y la extracción no recogió.</p>
+      {% endif %}
+      <table>
+        <thead><tr><th>Sección</th><th>Recall</th><th>Presentes</th><th>Términos</th></tr></thead>
+        <tbody>
+          {% for clave, sec in s.sections.items %}
+            <tr>
+              <td>{% if sec.recall == 0.0 %}<span class="error">{{ clave }}</span>{% else %}{{ clave }}{% endif %}</td>
+              <td>{{ sec.recall }}</td>
+              <td>{{ sec.present }}</td>
+              <td>{{ sec.salient_terms }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+    {% endif %}
+  </section>
+
+  <aside class="side" style="min-width:280px">
+    <h3>Ficha</h3>
+    <dl>
+      <dt>Tipo</dt><dd>{{ doc.get_doc_type_display|default:"—" }}</dd>
+      <dt>Título</dt><dd>{{ doc.title|default:"—" }}</dd>
+      <dt>Autores</dt><dd>{{ doc.authors|join:", "|default:"—" }}</dd>
+      <dt>Revista</dt><dd>{{ doc.journal|default:"—" }}</dd>
+      <dt>Año</dt><dd>{{ doc.year|default:"—" }}</dd>
+      <dt>DOI</dt><dd>{{ doc.doi|default:"—" }}</dd>
+      <dt>PMID</dt><dd>{{ doc.pmid|default:"—" }}</dd>
+      <dt>Chunks</dt><dd>{{ doc.chunk_count }}</dd>
+      <dt>SHA-256</dt><dd class="muted" style="word-break:break-all">{{ doc.sha256 }}</dd>
+    </dl>
+
+    {% if doc.json_file %}<p><a href="{% url 'ui:json' doc.pk %}">Descargar JSON generado</a></p>{% endif %}
+    {% if doc.error_msg %}<p class="muted">{{ doc.error_msg }}</p>{% endif %}
+
+    <h3 style="margin-top:16px">Colecciones</h3>
+    <p class="muted" style="font-size:13px">
+      {% for c in doc.collections.all %}<a href="{% url 'ui:library' %}?collection={{ c.id }}">{{ c.name }}</a>{% if not forloop.last %} · {% endif %}{% empty %}Sin colección{% endfor %}
+    </p>
+
+    <h3 style="margin-top:16px">Etiquetas</h3>
+    <div class="chips" style="margin:0 0 10px">
+      {% for t in doc.tags.all %}
+        <span class="chip active" style="display:inline-flex;gap:6px;align-items:center">{{ t.name }}
+          <form method="post" action="{% url 'ui:remove_tag' doc.pk t.id %}" style="display:inline">
+            {% csrf_token %}<button type="submit" title="Quitar" style="all:unset;cursor:pointer">×</button>
+          </form>
+        </span>
+      {% empty %}<span class="muted" style="font-size:13px">Sin etiquetas</span>{% endfor %}
+    </div>
+    <form method="post" action="{% url 'ui:add_tag' doc.pk %}" style="display:flex;gap:8px;margin-bottom:14px">
+      {% csrf_token %}
+      <input type="text" name="name" placeholder="nueva etiqueta" required>
+      <button type="submit">Añadir</button>
+    </form>
+
+    <form method="post" action="{% url 'ui:enrich' doc.pk %}" style="margin-bottom:8px">
+      {% csrf_token %}
+      <button type="submit">Actualizar metadatos (Crossref/PubMed)</button>
+    </form>
+    <p class="muted" style="font-size:12px">Busca por DOI o título y completa autores, revista, año y PMID. Requiere worker + conexión.</p>
+
+    {% if es_ficha_cima %}
+    <p class="muted" style="font-size:12px">Ficha técnica ingerida desde CIMA: su JSON sale del registro de la AEMPS, no de un PDF.</p>
+    {% if pdf_oficial %}<p><a href="{{ pdf_oficial }}" target="_blank" rel="noopener noreferrer">Ficha técnica oficial (PDF, AEMPS) ↗</a></p>{% endif %}
+    {% else %}
+    <form method="post" action="{% url 'ui:process' doc.pk %}"{% if doc.ya_procesado %} onsubmit="return confirm('El documento ya tiene un JSON generado. ¿Regenerarlo? Se reemplazará el JSON actual.');"{% endif %}>
+      {% csrf_token %}
+      <button type="submit">{% if doc.ya_procesado %}Regenerar{% else %}Procesar{% endif %} (PDF → JSON)</button>
+    </form>
+    <p class="muted" style="font-size:12px">Requiere worker Celery (o CELERY_EAGER=1) + JRE y backend LLM.</p>
+    {% endif %}
+
+    {% if doc.json_file and not doc.extraccion_parcial %}
+    <form method="post" action="{% url 'ui:index' doc.pk %}" style="margin-top:8px">
+      {% csrf_token %}
+      <button type="submit">{% if doc.status == "INDEXED" %}Reindexar{% else %}Indexar{% endif %} (JSON → ChromaDB)</button>
+    </form>
+    <p class="muted" style="font-size:12px">Requiere servidor ChromaDB + backend de embeddings. El documento debe estar en una especialidad.</p>
+    {% elif doc.extraccion_parcial %}
+    <p class="muted" style="font-size:12px; margin-top:8px">
+      No se puede indexar: el JSON está incompleto o no pasó la revisión de contenido. El motivo
+      aparece arriba.
+    </p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

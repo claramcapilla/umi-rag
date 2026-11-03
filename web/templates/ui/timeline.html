@@ -1,0 +1,50 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Snapshots · docsrepo{% endblock %}
+{% block content %}
+
+<h2 style="margin-top:0">Snapshots del corpus</h2>
+<p class="muted">Fotos inmutables del estado documental: qué documentos y con qué configuración
+   tenía el sistema en cada fecha. Reconstruyen el contexto de una respuesta del RAG.</p>
+
+<div class="create-card" style="max-width:560px">
+  <h4>Crear snapshot</h4>
+  <form method="post" action="{% url 'ui:create_snapshot' %}" style="display:flex;gap:10px;flex-wrap:wrap">
+    {% csrf_token %}
+    <input type="text" name="label" placeholder="etiqueta (opcional, p. ej. v3)">
+    <input type="text" name="backup_ref" placeholder="backup_ref (opcional)">
+    <button type="submit">Crear</button>
+  </form>
+</div>
+
+{% if snapshots %}
+<form method="get" action="{% url 'ui:snapshot_compare' %}" style="margin:18px 0">
+  <div class="chips" style="align-items:center">
+    <span class="muted">Comparar</span>
+    <select name="a">{% for s in snapshots %}<option value="{{ s.pk }}">{{ s.label }}</option>{% endfor %}</select>
+    <span class="muted">con</span>
+    <select name="b">{% for s in snapshots %}<option value="{{ s.pk }}">{{ s.label }}</option>{% endfor %}</select>
+    <button type="submit">Comparar</button>
+  </div>
+</form>
+
+<table>
+  <thead>
+    <tr><th>Etiqueta</th><th>Fecha</th><th>Docs</th><th>Config</th><th>Hash</th><th>Backup</th></tr>
+  </thead>
+  <tbody>
+    {% for s in snapshots %}
+    <tr>
+      <td><a href="{% url 'ui:snapshot_detail' s.pk %}">{{ s.label }}</a></td>
+      <td class="muted">{{ s.created_at|date:"d/m/Y H:i" }}</td>
+      <td>{{ s.document_count }}</td>
+      <td class="muted">{{ s.config_version|default:"—" }}</td>
+      <td class="muted" style="font-family:monospace">{{ s.corpus_hash|slice:":12" }}</td>
+      <td class="muted">{{ s.backup_ref|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty"><p>Aún no hay snapshots. Crea el primero para empezar la traza temporal.</p></div>
+{% endif %}
+{% endblock %}

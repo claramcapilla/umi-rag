@@ -1,0 +1,401 @@
+{% comment %}Widget de subida: se incluye desde la portada y desde dentro de una especialidad.
+   Vive aparte porque el modo «carpeta de especialidad» **crea** la especialidad, así que
+   tiene que estar disponible antes de haber entrado en ninguna.
+
+   La subida vive en un diálogo que se abre con el botón «+»: el dropzone ocupaba demasiado
+   en la página. El formulario y su lógica no cambian; solo se envuelven.{% endcomment %}
+<style>
+  .add-docs { display:inline-flex; align-items:center; gap:8px; margin:6px 0 18px;
+    padding:9px 16px 9px 13px; border:1px solid var(--accent); border-radius:var(--r-full);
+    background:var(--accent-light); color:var(--accent-hover); font:inherit; font-weight:600;
+    font-size:14px; cursor:pointer; transition:background var(--t),border-color var(--t); }
+  .add-docs:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .add-docs .plus { font-size:18px; line-height:1; }
+  dialog.upload-dlg { border:0; border-radius:var(--r-md); padding:0; max-width:560px; width:calc(100% - 32px);
+    box-shadow:0 24px 60px rgba(0,0,0,.28); color:var(--fg); background:var(--bg); }
+  dialog.upload-dlg::backdrop { background:rgba(20,15,16,.45); backdrop-filter:blur(2px); }
+  .upload-dlg .head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    padding:18px 20px 0; }
+  .upload-dlg .head h3 { margin:0; font-size:17px; }
+  .upload-dlg .head p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .upload-dlg .x { border:0; background:none; color:var(--muted); font-size:20px; line-height:1;
+    cursor:pointer; padding:2px 6px; border-radius:var(--r-md); flex:none; }
+  .upload-dlg .x:hover { background:var(--bg-3); color:var(--fg); }
+  /* El diálogo ya es la tarjeta: el form pierde su propio marco/sombra dentro. */
+  .upload-dlg form.upload { background:none; border:0; box-shadow:none; margin:0; padding:16px 20px 20px; }
+  .upload-choice { display:flex; gap:6px; margin:0 0 14px; padding:4px; background:var(--bg-3);
+    border-radius:var(--r-md); }
+  .upload-choice button { flex:1; border:0; background:none; color:var(--muted); font:inherit;
+    font-weight:600; font-size:13px; padding:8px 10px; border-radius:calc(var(--r-md) - 3px);
+    cursor:pointer; transition:background var(--t),color var(--t); }
+  .upload-choice button.on { background:var(--bg); color:var(--fg); box-shadow:var(--sh-sm); }
+  #panel-existing label.field { display:block; margin:0 0 12px; font-size:13px; font-weight:600; }
+  #panel-existing select { display:block; width:100%; margin-top:5px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:var(--r-md); background:var(--bg); color:var(--fg);
+    font:inherit; }
+</style>
+
+{% if descartados %}
+<div class="descartados">
+  <b>{{ descartados|length }} fichero{{ descartados|length|pluralize }} no se subi{{ descartados|length|pluralize:"ó,eron" }}</b>
+  — no era un PDF o superaba el tamaño máximo por fichero:
+  <ul>{% for nombre in descartados %}<li>{{ nombre }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<button type="button" class="add-docs" id="openupload">
+  <span class="plus">+</span> Añadir documentos
+</button>
+
+<dialog class="upload-dlg" id="uploaddlg">
+  <div class="head">
+    <div>
+      <h3>Añadir documentos</h3>
+      <p>
+        {% if not active_collection %}Arrastra la carpeta de una especialidad (o elígela); sus subcarpetas serán subespecialidades.
+        {% elif active_collection.is_specialty_root %}Arrastra una carpeta o PDFs sueltos para «{{ active_collection.name }}».
+        {% else %}Arrastra los PDFs que quieras añadir a «{{ active_collection.name }}».{% endif %}
+      </p>
+    </div>
+    <button type="button" class="x" id="closeupload" aria-label="Cerrar">✕</button>
+  </div>
+
+<form class="upload" id="uploadform" method="post" action="{% url 'ui:upload' %}" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="collection" value="{{ active_collection.id }}">
+
+  {% if not active_collection %}
+  <div class="upload-choice" id="uploadchoice">
+    <button type="button" class="on" data-opt="folder">📁 Carpeta de especialidad</button>
+    <button type="button" data-opt="existing">🗂 A una especialidad existente</button>
+  </div>
+  {% endif %}
+
+  <div id="panel-folder">
+  <label class="dropzone" id="dropzone" for="filepick">
+    {% if not active_collection %}
+      <span class="big">📁 Arrastra la carpeta de una especialidad — o haz clic</span>
+      <span class="files muted" id="dzinfo">Sus subcarpetas se crearán como subespecialidades. Al soltar eliges qué es lo que has traído.</span>
+    {% elif active_collection.is_specialty_root %}
+      <span class="big">📁 Arrastra una carpeta o PDFs — o haz clic</span>
+      <span class="files muted" id="dzinfo">Al soltar eliges si la carpeta es una especialidad o una subespecialidad; los PDFs sueltos van a {{ active_collection.name }}</span>
+    {% else %}
+      <span class="big">📄 Arrastra PDFs aquí o haz clic para elegir</span>
+      <span class="files muted" id="dzinfo">Se añadirán a {{ active_collection.name }}</span>
+    {% endif %}
+  </label>
+  <input class="visually-hidden" id="filepick" type="file" name="pdfs" accept="application/pdf" multiple>
+  <input class="visually-hidden" id="folderpick" type="file" webkitdirectory directory multiple>
+  <p class="muted" style="font-size:13px">
+    ¿No te va arrastrar? <button type="button" id="elegircarpeta" class="linklike">Elegir una carpeta</button>
+  </p>
+  <div id="moderow" hidden>
+    <fieldset class="modos">
+      <legend>¿Qué has soltado?</legend>
+      <label><input type="radio" name="modo" value="sueltos" checked> PDFs sueltos</label>
+      <label><input type="radio" name="modo" value="subespecialidad"> Carpeta de <b>subespecialidad</b></label>
+      <label><input type="radio" name="modo" value="especialidad"> Carpeta de <b>especialidad</b> (con subcarpetas)</label>
+    </fieldset>
+    <div id="campos-especialidad" hidden>
+      <label>Nombre de la especialidad
+        <input type="text" id="specialty_name" name="specialty_name" placeholder="p. ej. Alergología">
+      </label>
+      <p class="muted" id="arbol-resumen"></p>
+    </div>
+    <div id="campos-subespecialidad" hidden>
+      <label>Especialidad a la que pertenece
+        <select id="parent_specialty" name="parent_specialty">
+          {% for e in specialties %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+          <option value="">— crear una nueva —</option>
+        </select>
+      </label>
+      <label id="campo-nueva-especialidad" hidden>Nombre de la nueva especialidad
+        <input type="text" id="new_specialty_name" name="new_specialty_name" placeholder="p. ej. Alergología">
+      </label>
+      <label>Nombre de la subespecialidad
+        <input type="text" id="subspecialty" name="subspecialty" placeholder="nombre de la subespecialidad">
+      </label>
+    </div>
+  </div>
+  </div>
+
+  {% if not active_collection %}
+  <div id="panel-existing" hidden>
+    {% if specialties %}
+    <label class="field">Especialidad o subespecialidad de destino
+      <select id="target-collection">
+        {% for e in specialties %}
+          <optgroup label="{{ e.name }}">
+            <option value="{{ e.id }}" data-all="1">Toda «{{ e.name }}» (todas sus subespecialidades)</option>
+            {% for sub in e.children.all %}<option value="{{ sub.id }}">— {{ sub.name }}</option>{% endfor %}
+          </optgroup>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="dropzone" id="dropzone2" for="filepick2">
+      <span class="big">📄 Arrastra PDFs aquí o haz clic para elegir</span>
+      <span class="files muted">Se añadirán a la especialidad o subespecialidad elegida.</span>
+    </label>
+    <input class="visually-hidden" id="filepick2" type="file" name="pdfs2" accept="application/pdf" multiple>
+    {% else %}
+    <p class="muted">Aún no hay especialidades. Crea una desde «Nueva especialidad» o sube la carpeta de una.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <label class="procesar-ya">
+    <input type="checkbox" name="process_now" value="1">
+    Procesar a JSON al subir
+    <span class="muted" style="font-size:12px">
+      Convierte el PDF y lo estructura con el LLM en cuanto se sube. Sin marcar, los documentos
+      quedan en <code>UPLOADED</code> y se procesan desde el detalle cuando quieras.
+    </span>
+  </label>
+  <div class="upload-actions">
+    <span class="muted" id="dzcount" style="font-size:13px"></span>
+    <button type="submit" id="uploadbtn" disabled>Subir</button>
+  </div>
+</form>
+</dialog>
+
+<script>
+  (function () {
+    const form = document.getElementById("uploadform");
+    if (!form) return;
+    // Abrir/cerrar el diálogo de subida. El «+» lo abre; ✕, Esc (nativo) y el backdrop lo cierran.
+    const dlg = document.getElementById("uploaddlg");
+    const openBtn = document.getElementById("openupload");
+    const closeBtn = document.getElementById("closeupload");
+    if (dlg && openBtn) {
+      openBtn.addEventListener("click", () => dlg.showModal());
+      if (closeBtn) closeBtn.addEventListener("click", () => dlg.close());
+      dlg.addEventListener("click", (ev) => { if (ev.target === dlg) dlg.close(); });
+      {% if descartados %}dlg.showModal();{% endif %}  // reabrir si hubo ficheros descartados
+    }
+    const dz = document.getElementById("dropzone");
+    const pick = document.getElementById("filepick");
+    const count = document.getElementById("dzcount");
+    const moderow = document.getElementById("moderow");
+    const subinput = document.getElementById("subspecialty");
+    const espInput = document.getElementById("specialty_name");
+    const parentSel = document.getElementById("parent_specialty");
+    const nuevaEsp = document.getElementById("campo-nueva-especialidad");
+    const camposEsp = document.getElementById("campos-especialidad");
+    const camposSub = document.getElementById("campos-subespecialidad");
+    const arbol = document.getElementById("arbol-resumen");
+    const btn = document.getElementById("uploadbtn");
+    const choice = document.getElementById("uploadchoice");
+    const panelFolder = document.getElementById("panel-folder");
+    const panelExisting = document.getElementById("panel-existing");
+    const filepick2 = document.getElementById("filepick2");
+    const dz2 = document.getElementById("dropzone2");
+    const targetSel = document.getElementById("target-collection");
+    let opt = "folder";
+    // Cada elemento es {file, path}: `path` es la ruta relativa a la carpeta soltada, y es lo
+    // que el servidor usa para saber a qué subespecialidad va cada PDF. Aplanarla —lo que se
+    // hacía antes— mete una carpeta de especialidad entera en una sola subespecialidad.
+    let picked = [];
+
+    function modoActual() {
+      const r = form.querySelector("input[name=modo]:checked");
+      return r ? r.value : "sueltos";
+    }
+
+    function subcarpetaDe(path) {
+      const t = path.split("/").filter((x) => x && x !== "." && x !== "..");
+      return t.length > 1 ? t[0] : "";
+    }
+
+    function pintarModo() {
+      const m = modoActual();
+      camposEsp.hidden = m !== "especialidad";
+      camposSub.hidden = m !== "subespecialidad";
+      if (m === "especialidad") {
+        const subs = new Set(picked.map((p) => subcarpetaDe(p.path)).filter(Boolean));
+        const sueltos = picked.filter((p) => !subcarpetaDe(p.path)).length;
+        arbol.textContent = subs.size
+          ? "Se crearán " + subs.size + " subespecialidades: " + [...subs].sort().join(", ") +
+            (sueltos ? " · " + sueltos + " PDF sueltos irán a la especialidad" : "")
+          : "No hay subcarpetas: los " + picked.length + " PDFs irán a la especialidad.";
+      }
+      btn.disabled = picked.length === 0;
+    }
+
+    // Opción 2: subir PDFs sueltos a una especialidad o subespecialidad ya existente. Comparte
+    // el contador y el botón con la opción de carpeta; al cambiar de opción se limpia la selección
+    // para no arrastrar ficheros elegidos en la otra.
+    function pickedSueltos(items) {
+      picked = items;
+      count.textContent = items.length ? items.length + " PDF" + (items.length === 1 ? "" : "s") : "";
+      btn.disabled = items.length === 0;
+    }
+
+    function setOption(next) {
+      opt = next;
+      if (choice) {
+        choice.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.opt === next));
+      }
+      if (panelFolder) panelFolder.hidden = next !== "folder";
+      if (panelExisting) panelExisting.hidden = next !== "existing";
+      picked = [];
+      pick.value = "";
+      if (filepick2) filepick2.value = "";
+      if (moderow) moderow.hidden = true;
+      count.textContent = "";
+      btn.disabled = true;
+    }
+
+    if (choice) {
+      choice.querySelectorAll("button").forEach((b) =>
+        b.addEventListener("click", () => setOption(b.dataset.opt))
+      );
+    }
+    if (filepick2) {
+      filepick2.addEventListener("change", () => pickedSueltos(desdeInput(filepick2.files)));
+    }
+    if (dz2) {
+      ["dragenter", "dragover"].forEach((e) =>
+        dz2.addEventListener(e, (ev) => { ev.preventDefault(); dz2.classList.add("dragover"); })
+      );
+      ["dragleave", "drop"].forEach((e) =>
+        dz2.addEventListener(e, (ev) => { ev.preventDefault(); dz2.classList.remove("dragover"); })
+      );
+      dz2.addEventListener("drop", (ev) => pickedSueltos(desdeInput(ev.dataTransfer.files || [])));
+    }
+
+    form.querySelectorAll("input[name=modo]").forEach((r) => r.addEventListener("change", pintarModo));
+    if (parentSel) {
+      parentSel.addEventListener("change", () => { nuevaEsp.hidden = parentSel.value !== ""; });
+      nuevaEsp.hidden = parentSel.value !== "";
+    }
+
+    function setState(items, folder) {
+      picked = items;
+      moderow.hidden = items.length === 0;
+      if (items.length && folder) {
+        if (!subinput.value) subinput.value = folder;
+        const tieneSubs = items.some((p) => subcarpetaDe(p.path));
+        const radio = form.querySelector("input[name=modo][value=" + (tieneSubs ? "especialidad" : "subespecialidad") + "]");
+        if (radio) radio.checked = true;
+      }
+      count.textContent = items.length
+        ? items.length + " PDF" + (items.length === 1 ? "" : "s") + (folder ? " · carpeta: " + folder : "")
+        : "";
+      pintarModo();
+    }
+
+    function desdeInput(lista) {
+      return Array.from(lista)
+        .filter((f) => /\.pdf$/i.test(f.name))
+        .map((f) => {
+          const rel = f.webkitRelativePath || "";
+          // `webkitRelativePath` incluye la carpeta soltada como primer tramo; el servidor
+          // espera la ruta **relativa a ella**, así que se quita.
+          return { file: f, path: rel ? rel.split("/").slice(1).join("/") : f.name };
+        });
+    }
+
+    pick.addEventListener("change", () => setState(desdeInput(pick.files), ""));
+
+    const folderpick = document.getElementById("folderpick");
+    const elegir = document.getElementById("elegircarpeta");
+    if (elegir && folderpick) {
+      elegir.addEventListener("click", () => folderpick.click());
+      folderpick.addEventListener("change", () => {
+        const primero = folderpick.files[0];
+        const raiz = primero && primero.webkitRelativePath
+          ? primero.webkitRelativePath.split("/")[0]
+          : "";
+        setState(desdeInput(folderpick.files), raiz);
+      });
+    }
+
+    ["dragenter", "dragover"].forEach((e) =>
+      dz.addEventListener(e, (ev) => { ev.preventDefault(); dz.classList.add("dragover"); })
+    );
+    ["dragleave", "drop"].forEach((e) =>
+      dz.addEventListener(e, (ev) => { ev.preventDefault(); dz.classList.remove("dragover"); })
+    );
+    dz.addEventListener("drop", async (ev) => {
+      const items = ev.dataTransfer.items;
+      const entries = [];
+      if (items) {
+        for (const it of items) {
+          const e = it.webkitGetAsEntry && it.webkitGetAsEntry();
+          if (e) entries.push(e);
+        }
+      }
+      if (entries.length) {
+        let folder = "";
+        const items = [];
+        for (const e of entries) {
+          if (e.isDirectory) {
+            // La carpeta soltada no entra en la ruta: se recorren sus hijas con prefijo vacío,
+            // así el primer tramo de cada ruta es ya la subespecialidad y no la raíz.
+            if (!folder) folder = e.name;
+            for (const hijo of await readAll(e.createReader())) await collect(hijo, items, "");
+          } else {
+            await collect(e, items, "");
+          }
+        }
+        setState(items, folder);
+      } else {
+        setState(desdeInput(ev.dataTransfer.files || []), "");
+      }
+    });
+
+    function readAll(reader) {
+      return new Promise((res) => {
+        const out = [];
+        const step = () => reader.readEntries((ents) => {
+          if (!ents.length) res(out); else { out.push(...ents); step(); }
+        }, () => res(out));
+        step();
+      });
+    }
+    async function collect(entry, out, prefix) {
+      if (entry.isFile) {
+        await new Promise((res) => entry.file((f) => {
+          if (/\.pdf$/i.test(f.name)) out.push({ file: f, path: prefix + f.name });
+          res();
+        }, () => res()));
+      } else if (entry.isDirectory) {
+        const ents = await readAll(entry.createReader());
+        for (const e of ents) await collect(e, out, prefix + entry.name + "/");
+      }
+    }
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!picked.length) return;
+      btn.disabled = true;
+      btn.textContent = "Subiendo…";
+      const fd = new FormData();
+      fd.append("csrfmiddlewaretoken", form.querySelector("[name=csrfmiddlewaretoken]").value);
+      if (opt === "existing") {
+        const sel = targetSel ? targetSel.selectedOptions[0] : null;
+        fd.append("collection", targetSel ? targetSel.value : "");
+        fd.append("modo", sel && sel.dataset.all === "1" ? "especialidad_todo" : "sueltos");
+      } else {
+        fd.append("collection", form.querySelector("[name=collection]").value);
+        fd.append("modo", modoActual());
+        fd.append("subspecialty", subinput ? subinput.value.trim() : "");
+        fd.append("specialty_name", espInput ? espInput.value.trim() : "");
+        fd.append("parent_specialty", parentSel ? parentSel.value : "");
+        const nueva = document.getElementById("new_specialty_name");
+        fd.append("new_specialty_name", nueva ? nueva.value.trim() : "");
+      }
+      if (form.querySelector("[name=process_now]").checked) fd.append("process_now", "1");
+      // `pdfs` y `rel_paths` viajan en el mismo orden y el servidor los emparceja por índice.
+      for (const p of picked) fd.append("pdfs", p.file, p.file.name);
+      if (opt !== "existing") for (const p of picked) fd.append("rel_paths", p.path);
+      try {
+        const r = await fetch(form.action, { method: "POST", body: fd });
+        if (r.redirected) { location.href = r.url; } else { location.reload(); }
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = "Subir";
+      }
+    });
+  })();
+</script>

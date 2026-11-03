@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "documents.apps.DocumentsConfig",
     "simple_history",
     "pipeline.apps.PipelineConfig",
+    "ui.apps.UiConfig",
 ]
 
 MIDDLEWARE = [
@@ -38,7 +39,7 @@ WSGI_APPLICATION = "chatbot.wsgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

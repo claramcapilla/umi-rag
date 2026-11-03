@@ -1,0 +1,58 @@
+{% extends "docsrepo_base.html" %}
+{% block title %}Comparar snapshots · docsrepo{% endblock %}
+{% block content %}
+
+<p><a href="{% url 'ui:timeline' %}">← Snapshots</a></p>
+<h2 style="margin-top:0">{{ older.label }} → {{ newer.label }}</h2>
+
+{% if diff.config_changed %}
+  <p><span class="badge s-JSON_READY">La configuración cambió entre ambos snapshots</span></p>
+{% else %}
+  <p class="muted">Misma configuración (<code>ConfigVersion</code>) en ambos snapshots.</p>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="n">{{ diff.added|length }}</div><div class="l">Altas</div></div>
+  <div class="card"><div class="n">{{ diff.removed|length }}</div><div class="l">Bajas</div></div>
+  <div class="card"><div class="n">{{ diff.changed|length }}</div><div class="l">Cambios de estado</div></div>
+</div>
+
+<h3 class="section-title">Altas ({{ diff.added|length }})</h3>
+<table>
+  <thead><tr><th>SHA-256</th><th>Estado</th><th>Tipo</th></tr></thead>
+  <tbody>
+    {% for e in diff.added %}
+      <tr><td class="muted" style="font-family:monospace">{{ e.sha256|slice:":12" }}</td>
+          <td><span class="badge s-{{ e.status }}">{{ e.status }}</span></td>
+          <td class="muted">{{ e.doc_type|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="muted">Sin altas.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 class="section-title">Bajas ({{ diff.removed|length }})</h3>
+<table>
+  <thead><tr><th>SHA-256</th><th>Estado</th><th>Tipo</th></tr></thead>
+  <tbody>
+    {% for e in diff.removed %}
+      <tr><td class="muted" style="font-family:monospace">{{ e.sha256|slice:":12" }}</td>
+          <td><span class="badge s-{{ e.status }}">{{ e.status }}</span></td>
+          <td class="muted">{{ e.doc_type|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="muted">Sin bajas.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 class="section-title">Cambios de estado ({{ diff.changed|length }})</h3>
+<table>
+  <thead><tr><th>SHA-256</th><th>Antes</th><th>Después</th></tr></thead>
+  <tbody>
+    {% for c in diff.changed %}
+      <tr><td class="muted" style="font-family:monospace">{{ c.before.sha256|slice:":12" }}</td>
+          <td><span class="badge s-{{ c.before.status }}">{{ c.before.status }}</span>{% if c.before.error_stage %} <span class="muted">en {{ c.before.error_stage }}</span>{% endif %} · {{ c.before.chunk_count }} chunks</td>
+          <td><span class="badge s-{{ c.after.status }}">{{ c.after.status }}</span>{% if c.after.error_stage %} <span class="muted">en {{ c.after.error_stage }}</span>{% endif %} · {{ c.after.chunk_count }} chunks</td></tr>
+    {% empty %}<tr><td colspan="3" class="muted">Sin cambios de estado.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

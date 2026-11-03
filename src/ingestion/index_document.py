@@ -70,6 +70,7 @@ def index_clinical_document(
         for chunk in base_chunks:
             new_chunk = dict(chunk)
             new_chunk["chunk_id"] = f"{chunk['chunk_id']}__{specialty}"
+            new_chunk["document_id"] = str(document_id)
             new_chunk["specialty"] = specialty
             chunks.append(new_chunk)
 

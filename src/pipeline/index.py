@@ -56,7 +56,11 @@ def index_document(doc_id: str) -> None:
         )
         return
 
-    if doc.status not in (Status.JSON_READY, Status.INDEXED):
+    if doc.status not in (
+        Status.JSON_READY,
+        Status.INDEXED,
+        Status.FAILED,
+    ):
         logger.warning(
             "No se puede indexar %s desde el estado %s",
             doc.pk,

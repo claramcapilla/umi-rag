@@ -1,5 +1,9 @@
 """Convierte las entradas de chunks admitidas a un esquema JSONL común."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import hashlib
@@ -7,6 +11,10 @@ import json
 from pathlib import Path
 from typing import Any, Iterator
 
+
+# ============================================================
+# NORMALIZAR REGISTROS DE CHUNKS
+# ============================================================
 
 def _normalise_record(
     chunk: dict[str, Any],
@@ -22,8 +30,8 @@ def _normalise_record(
     )
     source_key = hashlib.sha256(relative_source.encode("utf-8")).hexdigest()[:16]
 
-    # JSONL canónico: conservar los campos adicionales definidos por quien
-    # produzca los chunks, validando los mínimos que necesita la indexación.
+    # En el JSONL canónico se conservan los campos adicionales y se validan
+    # los datos mínimos que necesita la indexación.
     if document is None:
         record = dict(chunk)
         text = record.get("text")
@@ -37,8 +45,8 @@ def _normalise_record(
         record.setdefault("document_id", f"source-{source_key}")
         return record
 
-    # Formato actual del benchmark: extraer los datos del documento y del
-    # chunk para que el retrieval pueda devolver referencias útiles.
+    # Combinar los datos del documento y del chunk permite devolver referencias 
+    # útiles durante la recuperación.
     text = chunk.get("text")
     if not isinstance(text, str) or not text.strip():
         raise ValueError(f"Chunk {chunk_index} sin texto válido: {source_file}")
@@ -70,8 +78,8 @@ def _normalise_record(
     if chunk.get("chunk_id") is not None:
         metadata["original_chunk_id"] = chunk["chunk_id"]
 
-    # El ID normalizado es determinista para que una reindexación actualice
-    # el mismo punto de Qdrant; el ID original se conserva en metadata.
+    # El ID determinista permite que una reindexación actualice el mismo punto
+    # de Qdrant; el ID original se conserva en los metadatos.
     return {
         "chunk_id": (
             f"{format_name}__{document_id}__{abbreviation}__{chunk_index:06d}"
@@ -91,6 +99,10 @@ def _normalise_record(
     }
 
 
+# ============================================================
+# RECORRER LOS FORMATOS DE ENTRADA
+# ============================================================
+
 def iter_normalized_chunks(source_dir: Path) -> Iterator[dict[str, Any]]:
     """Recorre JSONL canónicos y JSON chunk_results del benchmark."""
     if not source_dir.is_dir():
@@ -100,8 +112,8 @@ def iter_normalized_chunks(source_dir: Path) -> Iterator[dict[str, Any]]:
     files.extend(sorted(source_dir.rglob("*.json")))
     found = False
 
-    # Se admiten los dos formatos de entrada para no acoplar esta etapa al
-    # formato final que se elija para el chunking.
+    # Se admiten ambos formatos para no acoplar esta etapa a una única salida
+    # del proceso de chunking.
     for path in files:
         if path.suffix == ".jsonl":
             with path.open("r", encoding="utf-8") as stream:
@@ -135,6 +147,10 @@ def iter_normalized_chunks(source_dir: Path) -> Iterator[dict[str, Any]]:
             f"No se encontraron chunks JSONL ni archivos chunk_results JSON en {source_dir}"
         )
 
+
+# ============================================================
+# ESCRIBIR Y CARGAR CHUNKS NORMALIZADOS
+# ============================================================
 
 def write_normalized_chunks(source_dir: Path, output_file: Path) -> int:
     # Escribir a JSONL permite procesar registros individualmente y facilita

@@ -1,5 +1,9 @@
 """Conexión, colección densa y upserts de puntos en Qdrant."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import os
@@ -8,6 +12,10 @@ from typing import Any
 
 from qdrant_client import QdrantClient, models
 
+
+# ============================================================
+# CONECTAR Y PREPARAR LA COLECCIÓN
+# ============================================================
 
 def create_client(config: dict[str, Any]) -> QdrantClient:
     # Las variables de entorno permiten desplegar el mismo código en distintos
@@ -47,6 +55,10 @@ def ensure_collection(
         ),
     )
 
+
+# ============================================================
+# INSERTAR Y ELIMINAR PUNTOS
+# ============================================================
 
 def upsert_chunks(
     client: QdrantClient,

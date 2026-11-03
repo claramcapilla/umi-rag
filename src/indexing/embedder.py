@@ -1,5 +1,9 @@
 """Carga el modelo de embeddings y convierte textos en vectores por lotes."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import os
@@ -9,6 +13,10 @@ import numpy as np
 import torch
 from langchain_huggingface import HuggingFaceEmbeddings
 
+
+# ============================================================
+# CONFIGURAR EL MODELO DE EMBEDDINGS
+# ============================================================
 
 def create_embedder(
     config: dict[str, Any],
@@ -42,6 +50,10 @@ def create_embedder(
         },
     )
 
+
+# ============================================================
+# CONFIGURAR WORKERS Y DISPOSITIVOS
+# ============================================================
 
 def resolve_worker_config(
     config: dict[str, Any],
@@ -89,6 +101,10 @@ def resolve_worker_config(
             )
     return num_workers, cpu_threads, gpu_ids
 
+
+# ============================================================
+# PROCESAR EMBEDDINGS POR LOTES
+# ============================================================
 
 def _get_sentence_transformer(embedder: HuggingFaceEmbeddings) -> Any:
     """Obtiene el SentenceTransformer necesario para su pool multiproceso."""

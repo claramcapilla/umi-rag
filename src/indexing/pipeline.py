@@ -1,5 +1,9 @@
 """Orquesta normalización, embeddings en caché y escritura en Qdrant."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import json
@@ -14,6 +18,10 @@ from indexing.qdrant_store import (
     ensure_collection,
     upsert_chunks,
 )
+
+# ============================================================
+# RUTAS Y CONFIGURACIÓN
+# ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "indexing_config.json"
@@ -35,6 +43,10 @@ def _resolve(root: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else root / path
 
+
+# ============================================================
+# EJECUTAR LA INDEXACIÓN
+# ============================================================
 
 def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
     root = config_file.resolve().parent.parent
@@ -109,6 +121,10 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
     print(f"Chunks nuevos o modificados en Qdrant: {updated_count}/{len(chunks)}")
     return updated_count
 
+
+# ============================================================
+# OPERACIONES AUXILIARES
+# ============================================================
 
 def normalize_only(config_file: Path = DEFAULT_CONFIG) -> int:
     # Permite inspeccionar los registros normalizados sin cargar el modelo

@@ -1,5 +1,9 @@
 """Caché JSONL de vectores para evitar recalcular chunks sin cambios."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import hashlib
@@ -10,6 +14,10 @@ from typing import Any
 
 from indexing.embedder import iter_embedding_batches
 
+
+# ============================================================
+# IDENTIFICAR Y LEER LA CACHÉ
+# ============================================================
 
 def _text_hash(text: str) -> str:
     # El hash permite invalidar la caché si cambia el texto o su prefijo,
@@ -53,6 +61,10 @@ def load_cache(cache_dir: Path, model_name: str) -> dict[str, dict[str, Any]]:
     return cache
 
 
+# ============================================================
+# GUARDAR ENTRADAS DE CACHÉ
+# ============================================================
+
 def save_cache_entries(
     cache_dir: Path,
     model_name: str,
@@ -74,6 +86,10 @@ def save_cache_entries(
             )
         stream.flush()
 
+
+# ============================================================
+# GENERAR LOS EMBEDDINGS QUE FALTAN
+# ============================================================
 
 def embed_chunks_with_cache(
     embedder: Any,
@@ -118,7 +134,7 @@ def embed_chunks_with_cache(
         if len(new_vectors) != len(batch):
             raise RuntimeError("La cantidad de embeddings no coincide con el lote.")
         entries = []
-        for (index, _text, digest), vector in zip(batch, new_vectors):
+        for (index, _, digest), vector in zip(batch, new_vectors):
             vectors[index] = vector
             entries.append((str(chunks[index]["chunk_id"]), digest, vector))
         if use_cache:

@@ -1,1 +1,1 @@
-"""Document chunk normalization, embedding, and vector indexing."""
+"""Normalización de documentos, generación de embeddings e indexación vectorial."""

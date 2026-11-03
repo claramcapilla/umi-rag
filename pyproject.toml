@@ -9,7 +9,6 @@ dependencies = [
     "django>=5.0,<6",
     "httpx>=0.27,<1",
     "openai>=1.0,<2",
-ls
     "opendataloader-pdf>=2.0.0,<3",
     "pikepdf>=9,<10",
     "requests>=2.31,<3",

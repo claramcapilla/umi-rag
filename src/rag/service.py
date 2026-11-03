@@ -6,7 +6,12 @@ from typing import Any, Protocol
 
 
 class _Retriever(Protocol):
-    def retrieve(self, question: str) -> list[dict[str, Any]]: ...
+    def retrieve(
+        self,
+        question: str,
+        top_k: int | None = None,
+        filters: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]: ...
 
     def close(self) -> None: ...
 
@@ -21,6 +26,7 @@ class RagPipeline:
         self,
         question: str,
         history: list[dict[str, str]] | None = None,
+        specialty: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         from django.conf import settings
         from generation.generator import generate_answer
@@ -29,7 +35,10 @@ class RagPipeline:
 
             self._retriever = Retriever()
 
-        chunks = self._retriever.retrieve(question)
+        # Filtrar por especialidad si se ha seleccionado una.
+        filters = {"specialty": specialty} if specialty else None
+
+        chunks = self._retriever.retrieve(question, filters=filters)
         generation_config = {
             "base_url": settings.VLLM_URL,
             "model": settings.VLLM_MODEL,

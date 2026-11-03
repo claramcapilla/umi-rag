@@ -11,8 +11,8 @@ from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from src.document_processor.cima.errors import CimaUnavailable
-from src.documents.models import (
+from document_processor.cima.errors import CimaUnavailable
+from documents.models import (
     CimaRegistration,
     CimaSyncEvent,
     CimaSyncRun,
@@ -22,7 +22,7 @@ from src.documents.models import (
     Status,
     TipoEvento,
 )
-from src.library.models import Collection
+from library.models import Collection
 
 
 def _mensajes(respuesta: Any) -> str:
@@ -73,9 +73,9 @@ def buscar(monkeypatch: pytest.MonkeyPatch) -> Any:
                 raise resultado
             return resultado
 
-        monkeypatch.setattr("src.document_processor.cima.CimaClient.buscar", _buscar)
+        monkeypatch.setattr("document_processor.cima.CimaClient.buscar", _buscar)
         monkeypatch.setattr(
-            "src.document_processor.cima.CimaClient.from_settings",
+            "document_processor.cima.CimaClient.from_settings",
             classmethod(lambda cls: cls(base_url="https://cima.aemps.es/cima/rest")),
         )
         return criterios
@@ -144,7 +144,7 @@ def test_un_registro_ingerido_con_fallo_no_se_anuncia_como_hecho(
     Y reintentarlo desde aquí no arregla nada: la ingesta es idempotente y devuelve el mismo
     documento fallido. Lo honesto es decir que falló y mandar a la reconciliación.
     """
-    from src.documents.models import Status
+    from documents.models import Status
 
     documento = SourceDocument.objects.create(sha256="a" * 64, status=Status.FAILED)
     CimaRegistration.objects.create(nregistro="75831", document=documento, content_hash="h")
@@ -165,8 +165,8 @@ def test_el_reintento_masivo_no_reconvierte_las_fichas_retiradas(
     Con ello el recuento de fallidos no podía bajar nunca y nada distinguía esas filas de un fallo
     transitorio de verdad.
     """
-    from src.documents.models import Stage, Status
-    from src.pipeline.tasks import process_document_task
+    from documents.models import Stage, Status
+    from pipeline.tasks import process_document_task
 
     encolados: list[str] = []
     monkeypatch.setattr(process_document_task, "delay", lambda pk: encolados.append(pk))
@@ -283,7 +283,7 @@ def test_si_cima_no_responde_se_dice_sin_romper_la_pagina(client: Client, buscar
 
 @pytest.fixture
 def encolar(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
-    from src.pipeline.tasks import ingest_ficha_task
+    from pipeline.tasks import ingest_ficha_task
 
     encolados: list[tuple[str, str]] = []
     monkeypatch.setattr(ingest_ficha_task, "delay", lambda n, e: encolados.append((n, e)))
@@ -427,7 +427,7 @@ def test_el_lote_esta_acotado(
     Un formulario con mil casillas bloquea la ingesta entera durante horas y convierte el
     despliegue en un amplificador contra la Administración.
     """
-    from src.ui.views import MAX_FICHAS_POR_LOTE
+    from ui.views import MAX_FICHAS_POR_LOTE
 
     respuesta = client.post(
         reverse("ui:cima_ingest"),
@@ -445,7 +445,7 @@ def test_el_lote_esta_acotado(
 def test_el_tope_del_lote_se_cumple_justo_en_el_limite(
     client: Client, encolar: list[tuple[str, str]], alergologia: Collection
 ) -> None:
-    from src.ui.views import MAX_FICHAS_POR_LOTE
+    from ui.views import MAX_FICHAS_POR_LOTE
 
     client.post(
         reverse("ui:cima_ingest"),
@@ -511,7 +511,7 @@ def test_el_dashboard_sin_sincronizaciones_no_muestra_el_panel(client: Client) -
 
 
 def test_el_dashboard_acota_los_avisos_que_pinta(client: Client, settings: Any) -> None:
-    from src.ui import views
+    from ui import views
 
     for _ in range(3):
         _aviso()
@@ -608,7 +608,7 @@ def test_la_pagina_de_sincronizacion_sin_ejecuciones(client: Client) -> None:
 
 
 def test_la_pagina_de_sincronizacion_acota_los_eventos(client: Client) -> None:
-    from src.ui import views
+    from ui import views
 
     for _ in range(3):
         _aviso()

@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
 
-from src.documents.models import (
+from documents.models import (
     CimaRegistration,
     CorpusSnapshot,
     DocType,
@@ -19,7 +19,7 @@ from src.documents.models import (
     Stage,
     Status,
 )
-from src.library.models import Collection, Tag
+from library.models import Collection, Tag
 
 
 def _doc(sha: str, *, status: str = Status.UPLOADED, json: bool = False) -> SourceDocument:
@@ -41,9 +41,9 @@ def _no_broker(monkeypatch: pytest.MonkeyPatch) -> None:
 
     Los tests que verifican el encolado sobreescriben esto con su propio stub.
     """
-    from src.documents.tasks import enrich_document_task
-    from src.pipeline.index import index_document_task
-    from src.pipeline.tasks import process_document_task
+    from documents.tasks import enrich_document_task
+    from pipeline.index import index_document_task
+    from pipeline.tasks import process_document_task
 
     for task in (enrich_document_task, process_document_task, index_document_task):
         monkeypatch.setattr(task, "delay", lambda *a, **k: None)
@@ -169,7 +169,7 @@ def test_requires_login_does_not_serve_json_to_anonymous() -> None:
 def test_requires_login_blocks_anonymous_writes(monkeypatch: pytest.MonkeyPatch) -> None:
     doc = _doc("6" * 64)
     encolados: list[str] = []
-    from src.pipeline.tasks import process_document_task
+    from pipeline.tasks import process_document_task
 
     monkeypatch.setattr(process_document_task, "delay", lambda doc_id: encolados.append(doc_id))
     anonymous = Client()
@@ -462,7 +462,7 @@ def test_detail_renders(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_enrich_view_enqueues_task(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.documents import tasks as doc_tasks
+    from documents import tasks as doc_tasks
 
     doc = SourceDocument(sha256="9" * 64)
     doc.pdf_file.save("x.pdf", SimpleUploadedFile("x.pdf", b"%PDF"), save=True)
@@ -478,7 +478,7 @@ def test_enrich_view_enqueues_task(client: Client, monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.django_db
 def test_upload_enqueues_enrichment(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.documents import tasks as doc_tasks
+    from documents import tasks as doc_tasks
 
     enqueued: list[str] = []
     monkeypatch.setattr(
@@ -493,8 +493,8 @@ def test_upload_enqueues_enrichment(client: Client, monkeypatch: pytest.MonkeyPa
 
 
 def _espia_las_dos_colas(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
-    from src.documents import tasks as doc_tasks
-    from src.pipeline import tasks as pipe_tasks
+    from documents import tasks as doc_tasks
+    from pipeline import tasks as pipe_tasks
 
     colas: dict[str, list[str]] = {"enriquecer": [], "procesar": []}
     monkeypatch.setattr(
@@ -569,7 +569,7 @@ def test_la_casilla_aparece_desmarcada_en_la_biblioteca(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_index_view_enqueues_task(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.pipeline import index as index_mod
+    from pipeline import index as index_mod
 
     doc = SourceDocument(sha256="f" * 64)
     doc.pdf_file.save("x.pdf", SimpleUploadedFile("x.pdf", b"%PDF"), save=True)
@@ -593,7 +593,7 @@ def test_index_view_rejects_partial_extraction(
     de `index_document` corre en el worker: sin esta, el rechazo dependía de que nadie mandara el
     POST a mano.
     """
-    from src.pipeline import index as index_mod
+    from pipeline import index as index_mod
 
     doc = _doc("e" * 64, status=Status.FAILED, json=True)
     doc.error_stage = Stage.JSON
@@ -679,8 +679,8 @@ def test_dashboard_renders_with_counts(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_retry_failed_reenqueues_by_stage(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.pipeline import index as index_mod
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import index as index_mod
+    from pipeline import tasks as pipe_tasks
 
     idx: list[str] = []
     proc: list[str] = []
@@ -702,7 +702,7 @@ def test_retry_failed_reenqueues_by_stage(client: Client, monkeypatch: pytest.Mo
 
 @pytest.mark.django_db
 def test_retry_failed_scoped_to_specialty(client: Client, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     proc: list[str] = []
     monkeypatch.setattr(pipe_tasks.process_document_task, "delay", lambda i: proc.append(i))
@@ -731,7 +731,7 @@ def test_create_snapshot_and_timeline(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_snapshot_detail_renders(client: Client) -> None:
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     _doc("b" * 64, status=Status.INDEXED)
     snap = create_snapshot(label="v1")
@@ -742,7 +742,7 @@ def test_snapshot_detail_renders(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_snapshot_compare_renders(client: Client) -> None:
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     _doc("1" * 64)
     older = create_snapshot(label="v1")
@@ -764,7 +764,7 @@ def test_la_comparacion_distingue_dos_fallos_de_etapa_distinta(client: Client) -
     era justo la distinción que motivó llevar la etapa al manifiesto — un JSON bueno que no llegó
     a Chroma frente a uno incompleto que no debe indexarse.
     """
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     doc = _doc("7" * 64, status=Status.FAILED)
     doc.error_stage = Stage.INDEX
@@ -785,7 +785,7 @@ def test_la_comparacion_distingue_dos_fallos_de_etapa_distinta(client: Client) -
 @pytest.mark.django_db
 def test_el_detalle_del_snapshot_muestra_la_etapa_del_fallo(client: Client) -> None:
     """El dato existe para ser visto: capturarlo y no pintarlo deja el hallazgo sin cerrar."""
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     doc = _doc("8" * 64, status=Status.FAILED)
     doc.error_stage = Stage.JSON
@@ -800,7 +800,7 @@ def test_el_detalle_del_snapshot_muestra_la_etapa_del_fallo(client: Client) -> N
 @pytest.mark.django_db
 def test_un_documento_sin_fallo_no_pinta_etapa(client: Client) -> None:
     """El contrapunto: un `INDEXED` no lleva etapa, y la fila no puede decir «en »."""
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     _doc("9" * 64, status=Status.INDEXED)
     snap = create_snapshot(label="v1")
@@ -834,7 +834,7 @@ def test_comparar_snapshots_ordena_por_fecha_aunque_se_pasen_al_reves(client: Cl
     Sin el intercambio, comparar el nuevo contra el viejo invierte altas y bajas: los documentos
     añadidos se reportarían como borrados del corpus.
     """
-    from src.pipeline.snapshots import create_snapshot
+    from pipeline.snapshots import create_snapshot
 
     viejo = create_snapshot(label="v1")
     _doc("c" * 64, status=Status.INDEXED)
@@ -896,7 +896,7 @@ def test_procesar_desde_el_detalle_encola_la_etapa_pdf_a_json(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """El botón «Procesar» del detalle: es la vía manual cuando la subida no marcó la casilla."""
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     doc = _doc("e" * 64)
     encolados: list[str] = []
@@ -913,7 +913,7 @@ def test_un_get_al_endpoint_de_proceso_no_encola_nada(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Procesar gasta JVM y LLM: un GET —un prefetch del navegador— no puede dispararlo."""
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     doc = _doc("f" * 64)
     encolados: list[str] = []
@@ -932,7 +932,7 @@ def test_procesar_un_documento_ya_procesado_lo_regenera(
     """El botón «Regenerar» sobre un documento ya convertido lo reinicia a UPLOADED y lo reencola:
     así el reproceso pedido a mano sí corre, mientras la reentrega de la cola —que no reinicia— se
     sigue omitiendo."""
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     doc = _doc("d" * 64, status=Status.JSON_READY, json=True)
     encolados: list[str] = []
@@ -964,7 +964,7 @@ def _ficha_de_cima(pdf_url: object) -> SourceDocument:
 def test_una_ficha_de_cima_no_se_regenera_desde_un_pdf(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     doc = _ficha_de_cima("https://cima.aemps.es/cima/pdfs/ft/75831/FT_75831.pdf")
     encolados: list[str] = []
@@ -1016,7 +1016,7 @@ def test_un_enlace_al_pdf_que_no_es_de_cima_no_se_pinta(client: Client, pdf_url:
 
 
 def test_el_enlace_al_pdf_solo_sale_de_un_json_con_bloque_source() -> None:
-    from src.ui.views import _pdf_oficial
+    from ui.views import _pdf_oficial
 
     assert _pdf_oficial(None) is None
     assert _pdf_oficial({"_source": "no es un objeto"}) is None
@@ -1504,7 +1504,7 @@ def test_dashboard_data_memoiza_la_reconciliacion_entre_polls(
     petición. Ahora se memoiza: dos polls seguidos la calculan una sola vez."""
     card = Collection.objects.create(name="Cardiología", is_specialty_root=True)
     _doc("g7" + "0" * 62, status=Status.JSON_READY, json=True).collections.add(card)
-    from src.documents.reconciliation import reconciliation_by_specialty as real
+    from documents.reconciliation import reconciliation_by_specialty as real
 
     llamadas = {"n": 0}
 
@@ -1512,7 +1512,7 @@ def test_dashboard_data_memoiza_la_reconciliacion_entre_polls(
         llamadas["n"] += 1
         return real()
 
-    monkeypatch.setattr("src.ui.views.reconciliation_by_specialty", _contando)
+    monkeypatch.setattr("ui.views.reconciliation_by_specialty", _contando)
 
     client.get(reverse("ui:dashboard_data"))
     client.get(reverse("ui:dashboard_data"))
@@ -1577,7 +1577,7 @@ def test_la_biblioteca_no_lista_el_bucket_de_fichas_como_especialidad(client: Cl
     bucket habría aparecido como una más. Se filtra por `is_specialty_root`, igual que ya hace la
     reconciliación, y las fichas se navegan en su propia ventana.
     """
-    from src.library.models import FICHA_BUCKET_NAME, Collection
+    from library.models import FICHA_BUCKET_NAME, Collection
 
     Collection.ficha_bucket()
     Collection.objects.create(name="Cardiología", is_specialty_root=True)
@@ -1725,7 +1725,7 @@ def test_una_ficha_por_documento_aunque_tenga_varios_registros(client: Client) -
 def test_una_madre_con_capitulos_en_curso_no_se_regenera(
     client: Client, monkeypatch: pytest.MonkeyPatch, estado_capitulo: str, se_encola: bool
 ) -> None:
-    from src.pipeline import tasks as pipe_tasks
+    from pipeline import tasks as pipe_tasks
 
     madre = _doc("m" * 64, status=Status.SPLIT)
     SourceDocument.objects.create(sha256="c" * 64, parent=madre, status=estado_capitulo)

@@ -12,7 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
-from src.library.models import Collection
+from library.models import Collection
 
 from .models import SourceDocument
 from .naming import clean_name

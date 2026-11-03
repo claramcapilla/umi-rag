@@ -20,6 +20,7 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonRe
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from document_processor.extraction import FichaTecnicaNoIngerible
 from documents.models import (
@@ -225,7 +226,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 
 def _avisos_de_cima() -> dict[str, Any]:
-    from src.pipeline.cima_sync import documentos_por_retirar, resumen_de
+    from pipeline.cima_sync import documentos_por_retirar, resumen_de
 
     pendientes = CimaSyncEvent.objects.filter(tipo__in=TIPOS_QUE_AVISAN, visto_en__isnull=True)
     ultima = CimaSyncRun.objects.first()
@@ -279,7 +280,7 @@ def timeline(request: HttpRequest) -> HttpResponse:
 def create_snapshot_view(request: HttpRequest) -> HttpResponse:
     """Crea un snapshot inmutable del estado actual del corpus."""
     if request.method == "POST":
-        from src.pipeline.snapshots import create_snapshot
+        from pipeline.snapshots import create_snapshot
 
         create_snapshot(
             label=request.POST.get("label", "").strip(),
@@ -301,7 +302,7 @@ def snapshot_compare(request: HttpRequest) -> HttpResponse:
     if older.created_at > newer.created_at:
         older, newer = newer, older
 
-    from src.pipeline.snapshots import compare_snapshots
+    from pipeline.snapshots import compare_snapshots
 
     diff = compare_snapshots(older, newer)
     return render(
@@ -324,11 +325,11 @@ def _reenqueue(doc: SourceDocument) -> bool:
     if doc.error_msg.startswith(FichaTecnicaNoIngerible.__name__):
         return False
     if doc.error_stage == Stage.INDEX:
-        from src.pipeline.index import index_document_task
+        from pipeline.index import index_document_task
 
         index_document_task.delay(str(doc.pk))
     else:
-        from src.pipeline.tasks import process_document_task
+        from pipeline.tasks import process_document_task
 
         process_document_task.delay(str(doc.pk))
     return True
@@ -337,7 +338,7 @@ def _reenqueue(doc: SourceDocument) -> bool:
 def retry_failed(request: HttpRequest) -> HttpResponse:
     """Reencola los documentos en FAILED (todos, o los de una especialidad)."""
     if request.method == "POST":
-        from src.pipeline.index import resolve_specialties
+        from pipeline.index import resolve_specialties
 
         specialty = request.POST.get("specialty", "")
         failed = SourceDocument.objects.filter(status=Status.FAILED).prefetch_related("collections")
@@ -355,8 +356,8 @@ def retry_failed(request: HttpRequest) -> HttpResponse:
             )
     return redirect("ui:dashboard")
 
-
-def serve_pdf(request: HttpRequest, pk: str) -> FileResponse:
+@xframe_options_sameorigin
+def serve_pdf(request: HttpRequest, pk) -> HttpResponse:
     """Sirve el PDF del documento (independiente de DEBUG/servidor de media)."""
     doc = get_object_or_404(SourceDocument, pk=pk)
     if not doc.pdf_file:
@@ -437,21 +438,12 @@ def create_collection(request: HttpRequest) -> HttpResponse:
 
 
 def _encolar_tras_la_subida(doc_ids: list[str], *, procesar: bool) -> None:
-    """Encola el enriquecimiento bibliográfico y, si se pidió, la etapa PDF→JSON.
-
-    Extraído de `upload` porque dejaba la vista por encima del límite de complejidad, y el
-    proyecto prefiere un helper con nombre a un `noqa: C901`. De paso el bucle queda en un solo
-    sitio: un `delay` fuera de él procesaría únicamente el último documento del lote.
-    """
-    from src.documents.tasks import enrich_document_task
-
-    for doc_id in doc_ids:
-        enrich_document_task.delay(doc_id)
+    """Encola el procesamiento únicamente cuando se solicita."""
 
     if not procesar:
         return
 
-    from src.pipeline.tasks import process_document_task
+    from pipeline.tasks import process_document_task
 
     for doc_id in doc_ids:
         process_document_task.delay(doc_id)
@@ -715,7 +707,7 @@ def process(request: HttpRequest, pk: str) -> HttpResponse:
     —una entrega duplicada, que no reinicia, sí la sigue omitiendo—.
     """
     if request.method == "POST":
-        from src.pipeline.tasks import process_document_task
+        from pipeline.tasks import process_document_task
 
         doc = get_object_or_404(SourceDocument, pk=pk)
         if doc.cima_registrations.exists():
@@ -740,14 +732,14 @@ def process(request: HttpRequest, pk: str) -> HttpResponse:
 
 
 def index(request: HttpRequest, pk: str) -> HttpResponse:
-    """(Re)indexa a ChromaDB desde el JSON ya generado (cola `chroma`).
+    """(Re)indexa el documento en Qdrant utilizando su JSON clínico.
 
     Un documento con extracción parcial no se encola siquiera. La plantilla ya no ofrece el botón
     y la tarea lo rechaza, pero un POST directo llegaría aquí, y encolar para que falle en el
     worker no le dice nada a quien lo pidió.
     """
     if request.method == "POST":
-        from src.pipeline.index import index_document_task
+        from pipeline.index import index_document_task
 
         doc = get_object_or_404(SourceDocument, pk=pk)
         if doc.extraccion_parcial:
@@ -761,7 +753,7 @@ def index(request: HttpRequest, pk: str) -> HttpResponse:
 def enrich(request: HttpRequest, pk: str) -> HttpResponse:
     """Actualiza los metadatos bibliográficos (Crossref/PubMed) del documento."""
     if request.method == "POST":
-        from src.documents.tasks import enrich_document_task
+        from documents.tasks import enrich_document_task
 
         enrich_document_task.delay(str(pk))
     return redirect("ui:detail", pk=pk)
@@ -819,7 +811,7 @@ def _candidatos_de_cima(resultados: list[dict[str, Any]]) -> list[dict[str, Any]
     financiación de un biológico no se quede sin sus indicaciones —45 filas en dupilumab, 36 en
     omalizumab—.
     """
-    from src.document_processor.cima.docs import ficha_segmentada
+    from document_processor.cima.docs import ficha_segmentada
 
     candidatos: list[dict[str, Any]] = []
     for medicamento in resultados:
@@ -856,7 +848,7 @@ def fichas(request: HttpRequest) -> HttpResponse:
     calculan sobre la búsqueda activa (no sobre el total) para que el número case con lo que abre el
     filtro, y con una sola lectura de `atc_groups` en vez de un `COUNT` por grupo.
     """
-    from src.document_processor.cima.atc import ATC_GROUP_LABELS
+    from document_processor.cima.atc import ATC_GROUP_LABELS
 
     consulta = request.GET.get("q", "").strip()
     grupo = request.GET.get("atc", "")
@@ -943,8 +935,8 @@ def cima(request: HttpRequest) -> HttpResponse:
     reserva para la página vacía, donde hace falta, porque `pagina * 0 < total` es cierto para
     cualquier total y ofrecería una página siguiente tras otra para siempre.
     """
-    from src.document_processor.cima import CimaClient
-    from src.document_processor.cima.errors import CimaUnavailable
+    from document_processor.cima import CimaClient
+    from document_processor.cima.errors import CimaUnavailable
 
     consulta = request.GET.get("q", "").strip()
     criterio = request.GET.get("por", "practiv1")
@@ -1025,8 +1017,8 @@ def cima_ingest(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return redirect("ui:cima")
 
-    from src.document_processor.cima import NREGISTRO
-    from src.pipeline.tasks import ingest_ficha_task
+    from document_processor.cima import NREGISTRO
+    from pipeline.tasks import ingest_ficha_task
 
     destino = f"{reverse('ui:cima')}?{urlencode(_criterio_de_busqueda(request))}"
     especialidad = Collection.especialidad_por_id(request.POST.get("especialidad", ""))
@@ -1059,7 +1051,7 @@ def cima_ingest(request: HttpRequest) -> HttpResponse:
 
 
 def cima_sync(request: HttpRequest) -> HttpResponse:
-    from src.pipeline.cima_sync import resumen_de
+    from pipeline.cima_sync import resumen_de
 
     ejecuciones = CimaSyncRun.objects.all()
     elegida = (

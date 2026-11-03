@@ -138,3 +138,32 @@ MEDIA_URL = "/media/"
 
 # Longitud máxima del Markdown antes de dividirlo en capítulos.
 GUIDE_SPLIT_MAX_CHARS = 100000
+
+# Tiempo de caché del dashboard (segundos)
+DASHBOARD_CACHE_SECONDS = 60
+
+# Límites para la subida de documentos PDF
+
+# Tamaño máximo de un PDF individual: 50 MB
+MAX_PDF_UPLOAD_BYTES = 50 * 1024 * 1024
+
+# Tamaño máximo de un lote de PDFs: 200 MB
+MAX_PDF_BATCH_BYTES = 200 * 1024 * 1024
+
+# ============================================================
+# CONFIGURACIÓN ADICIONAL DE DOCSREPO
+# ============================================================
+
+# BiFiMed: enriquecimiento de fichas técnicas
+BIFIMED_ENABLED = False
+BIFIMED_CACHE_SECONDS = 600
+
+# CIMA: API oficial de la AEMPS
+CIMA_BASE_URL = "https://cima.aemps.es/cima/rest"
+CIMA_ALLOWED_ENDPOINTS = [
+    "https://cima.aemps.es/cima/rest"
+]
+CIMA_TIMEOUT = 30
+CIMA_MAX_BYTES = 8 * 1024 * 1024
+CIMA_REQUEST_DELAY = 0.25
+CIMA_USER_AGENT = "docsrepo/1.0 (gestion documental RAG clinico)"

@@ -1,6 +1,6 @@
 import pytest
 
-from src.ui.templatetags.especialidades import especialidad_icono
+from ui.templatetags.especialidades import especialidad_icono
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+# Iteración de embeddings en lotes
 from indexing.embedder import iter_embedding_batches
 
 

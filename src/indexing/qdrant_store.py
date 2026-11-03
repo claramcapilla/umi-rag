@@ -87,7 +87,16 @@ def ensure_collection(
 
 
 # ============================================================
-# INSERTAR Y ELIMINAR PUNTOS
+# GENERAR ID DETERMINISTA DEL PUNTO
+# ============================================================
+
+def point_id_for_chunk(chunk_id: str) -> str:
+    """Devuelve el ID determinista de Qdrant para un chunk."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, str(chunk_id)))
+
+
+# ============================================================
+# INSERTAR O ACTUALIZAR PUNTOS
 # ============================================================
 
 def upsert_chunks(
@@ -121,10 +130,7 @@ def upsert_chunks(
     for start in range(0, len(chunks), batch_size):
         chunk_batch = chunks[start : start + batch_size]
         vector_batch = vectors[start : start + batch_size]
-        point_ids = [
-            str(uuid.uuid5(uuid.NAMESPACE_URL, str(chunk["chunk_id"])))
-            for chunk in chunk_batch
-        ]
+        point_ids = [point_id_for_chunk(chunk["chunk_id"]) for chunk in chunk_batch]
         existing = {
             str(point.id): point
             for point in client.retrieve(
@@ -158,6 +164,10 @@ def upsert_chunks(
             updated_count += len(points)
     return updated_count
 
+
+# ============================================================
+# ELIMINAR PUNTOS
+# ============================================================
 
 def delete_points(
     client: QdrantClient,

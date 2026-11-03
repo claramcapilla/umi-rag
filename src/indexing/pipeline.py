@@ -3,8 +3,9 @@
 Carga la configuración, normaliza las entradas de chunks, genera o recupera
 sus embeddings desde la caché y crea o actualiza los puntos de la colección
 configurada. También ofrece una operación para normalizar sin cargar el modelo
-ni conectarse a Qdrant, y una función para generar el embedding de una consulta
-con el prefijo configurado para consultas.
+ni conectarse a Qdrant, una entrada para indexar chunks ya preparados con el
+mismo flujo y una función para generar el embedding de una consulta con el
+prefijo configurado para consultas.
 """
 
 # ============================================================
@@ -17,12 +18,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+# Configuración y flujo de indexación
 from indexing.embedder import create_embedder, resolve_worker_config
 from indexing.embedding_cache import embed_chunks_with_cache
 from indexing.normalizer import load_normalized_chunks, write_normalized_chunks
 from indexing.qdrant_store import (
     create_client,
+    delete_points,
     ensure_collection,
+    point_id_for_chunk,
     upsert_chunks,
 )
 
@@ -67,8 +71,14 @@ def _resolve(root: Path, value: str) -> Path:
     return path if path.is_absolute() else root / path
 
 
+def _validate_batch_sizes(indexing_config: dict[str, Any]) -> None:
+    for key in ("batch_size", "embedding_batch_size", "cache_batch_size"):
+        if int(indexing_config[key]) < 1:
+            raise ValueError(f"indexing.{key} debe ser al menos 1.")
+
+
 # ============================================================
-# EJECUTAR LA INDEXACIÓN
+# INDEXAR CHUNKS NORMALIZADOS
 # ============================================================
 
 def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
@@ -92,13 +102,9 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
     root = config_file.resolve().parent.parent
     config = load_config(config_file)
     paths = config["paths"]
-    embedding_config = config["embeddings"]
     indexing_config = config["indexing"]
-    qdrant_config = config["qdrant"]
     normalized_file = _resolve(root, paths["normalized_chunks_file"])
-    for key in ("batch_size", "embedding_batch_size", "cache_batch_size"):
-        if int(indexing_config[key]) < 1:
-            raise ValueError(f"indexing.{key} debe ser al menos 1.")
+    _validate_batch_sizes(indexing_config)
 
     # Fase 1: convertir las salidas del chunker a un formato de indexación
     # estable y guardarlo para poder inspeccionarlo o reutilizarlo.
@@ -113,6 +119,55 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
             "Hay chunk_id duplicados en los documentos normalizados. "
             "Cada chunk debe tener un ID estable y único."
         )
+    result = _index_chunks(chunks, config, root, config_file)
+    updated_count = result["updated_count"]
+    print(f"Chunks nuevos o modificados en Qdrant: {updated_count}/{len(chunks)}")
+    return updated_count
+
+
+# ============================================================
+# INDEXAR CHUNKS PREPARADOS
+# ============================================================
+
+def index_chunks(
+    chunks: list[dict[str, Any]],
+    config_file: Path = DEFAULT_CONFIG,
+    previous_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Indexa chunks en Qdrant usando la configuración común del proyecto.
+
+    Esta operación comparte el modelo, la caché, la colección y el formato de
+    payload con la indexación por lotes. Si se proporcionan ``previous_ids``,
+    elimina los puntos que ya no están representados por los chunks nuevos,
+    después de completar correctamente el upsert.
+    """
+    config_file = Path(config_file).resolve()
+    config = load_config(config_file)
+    root = config_file.parent.parent
+    return _index_chunks(chunks, config, root, config_file, previous_ids)
+
+
+# ============================================================
+# FLUJO COMPARTIDO DE EMBEDDINGS Y QDRANT
+# ============================================================
+
+def _index_chunks(
+    chunks: list[dict[str, Any]],
+    config: dict[str, Any],
+    root: Path,
+    config_file: Path,
+    previous_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Ejecuta las fases compartidas de embeddings y persistencia vectorial."""
+    if not chunks:
+        raise ValueError("No hay chunks para indexar.")
+
+    embedding_config = config["embeddings"]
+    indexing_config = config["indexing"]
+    qdrant_config = config["qdrant"]
+    paths = config["paths"]
+    _validate_batch_sizes(indexing_config)
+
     # Se valida antes de cargar el modelo para dar un error claro si todavía
     # no se ha decidido qué embeddings usar.
     model_name = embedding_config.get("model_name")
@@ -142,7 +197,11 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
         gpu_ids=gpu_ids,
         embedding_batch_size=int(indexing_config["embedding_batch_size"]),
     )
+    if len(vectors) != len(chunks):
+        raise ValueError("No se ha generado un embedding por chunk.")
     vector_size = len(vectors[0])
+    point_ids = [point_id_for_chunk(str(chunk["chunk_id"])) for chunk in chunks]
+    stale_ids = list(set(previous_ids or []) - set(point_ids))
 
     # Fase 3: comprobar/crear una única colección y subir los puntos por lotes.
     client = create_client(qdrant_config)
@@ -156,14 +215,21 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
             int(indexing_config["batch_size"]),
             embedding_model=model_name,
         )
+        if stale_ids:
+            delete_points(client, qdrant_config["collection_name"], stale_ids)
     finally:
         client.close()
-    print(f"Chunks nuevos o modificados en Qdrant: {updated_count}/{len(chunks)}")
-    return updated_count
+    return {
+        "qdrant_ids": point_ids,
+        "updated_count": updated_count,
+        "deleted_count": len(stale_ids),
+        "embedding_model": model_name,
+        "collection_name": qdrant_config["collection_name"],
+    }
 
 
 # ============================================================
-# OPERACIONES AUXILIARES
+# NORMALIZAR SIN INDEXAR
 # ============================================================
 
 def normalize_only(config_file: Path = DEFAULT_CONFIG) -> int:
@@ -187,6 +253,10 @@ def normalize_only(config_file: Path = DEFAULT_CONFIG) -> int:
         _resolve(root, paths["normalized_chunks_file"]),
     )
 
+
+# ============================================================
+# GENERAR EMBEDDING DE CONSULTA
+# ============================================================
 
 def embed_query(text: str, embedder: Any, config: dict[str, Any]) -> list[float]:
     """Genera el embedding de una consulta con el prefijo configurado.

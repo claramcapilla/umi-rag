@@ -1,10 +1,16 @@
+"""Plan jerárquico para dividir artículos científicos (papers).
+
+Organiza el contenido bibliográfico, metodológico y clínico en grupos
+semánticos; las hojas del árbol indican las rutas JSON que se agrupan.
+"""
+
 from chunking.chunkers.json.JSON_chunker import SplitNode
 
 DOCUMENT_PLAN_PAPER = SplitNode(
     name="complete_document",
     children=[
 
-        # Metadata
+        # Identificación bibliográfica, clasificación y datos administrativos.
         SplitNode(
             name="metadata",
             children=[
@@ -113,7 +119,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Background
+        # Contexto clínico del estudio y preguntas que pretende responder.
         SplitNode(
             name="background_and_objective",
             children=[
@@ -146,11 +152,11 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Methods
+        # Diseño, población, criterios, intervenciones, resultados y métodos.
         SplitNode(
             name="methods",
             children=[
-                # Diseño y características del estudio
+                # Diseño del estudio y características de la población incluida.
                 SplitNode(
                     name="design_characteristics",
                     children=[
@@ -192,7 +198,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
                     ]
                 ),
 
-                # Criterios de inclusión y exclusión
+                # Criterios que determinan qué participantes pueden incluirse.
                 SplitNode(
                     name="criteria",
                     children=[
@@ -207,7 +213,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
                     ]
                 ),
 
-                # Intervenciones, comparadores y variables de resultado
+                # Tratamientos comparados y resultados evaluados.
                 SplitNode(
                     name="interventions_outcomes",
                     children=[
@@ -240,7 +246,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
                     ]
                 ),
 
-                # Estadística, seguimiento y búsqueda bibliográfica
+                # Análisis estadístico, seguimiento y fuentes de evidencia.
                 SplitNode(
                     name="statistics",
                     children=[
@@ -293,7 +299,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Results
+        # Hallazgos principales, de seguridad, secundarios y por subgrupos.
         SplitNode(
             name="results",
             children=[
@@ -316,7 +322,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Discussion and implications   
+        # Interpretación de resultados, limitaciones e implicaciones futuras.
         SplitNode(
             name="discussion_and_implications",
             children=[
@@ -385,7 +391,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Clinical entities
+        # Entidades clínicas y datos numéricos extraídos del artículo.
         SplitNode(
             name="clinical_entities",
             children=[
@@ -412,7 +418,7 @@ DOCUMENT_PLAN_PAPER = SplitNode(
             ]
         ),
 
-        # Tables and conclusions
+        # Tablas, conclusión principal y resumen narrativo.
         SplitNode(
             name="tables_and_conclusions",
             children=[

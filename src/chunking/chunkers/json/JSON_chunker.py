@@ -1,34 +1,24 @@
-"""
-HierarchicalJSONChunker: Chunking jerárquico para documentos JSON clínicos.
+"""Implementa el chunking jerárquico de documentos JSON clínicos.
 
-Este chunker:
-1. Recorre el documento JSON siguiendo un document plan específico
-   para cada tipología documental (paper, guideline, ficha técnica).
-2. Respeta la estructura jerárquica del documento:
-   - niveles,
-   - grupos,
-   - rutas JSON,
-   - listas indivisibles,
-   - bloques semánticos.
-3. Evita cortes peligrosos en tablas, listas clínicas y secciones críticas.
-4. Genera metadatos completos para trazabilidad:
-   - nivel,
-   - grupo,
-   - rutas JSON,
-   - límites de tokens,
-   - flags de exceso de tamaño.
-5. Produce chunks seguros y adecuados para RAG médico.
-
-Este archivo define la lógica del chunking JSON. Los document plans
-definen la estructura que se debe seguir para cada tipo documental.
+Recorre cada documento según el plan definido para su tipología, agrupa sus
+campos en chunks semánticos y conserva metadatos de trazabilidad y límites de
+tokens. Los planes de documento definen cómo se organizan los campos; este
+módulo implementa la lógica para procesarlos.
 """
+
+# ============================================================
+# IMPORTS
+# ============================================================
 
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 import re
 
+# ============================================================
 # 1. ESTRUCTURAS DE DATOS
+# ============================================================
+
 @dataclass
 class Chunk:
     # Representa los chunks generados por el algoritmo, con información
@@ -59,9 +49,14 @@ class ResolvedField:
     path: tuple[str | int, ...]
     value: Any
 
+# ============================================================
 # 2. PLAN DE DIVISIÓN SEMÁNTICA ASOCIADO AL TIPO DE DOCUMENTO: PARÁMETRO
+# ============================================================
 
+# ============================================================
 # 3. FUNCIONES AUXILIARES DE TEXTO
+# ============================================================
+
 def is_present(value: Any) -> bool:
     # Comprueba recursivamente si un valor JSON contiene información real.
 
@@ -388,7 +383,9 @@ def render_fields(fields: list[ResolvedField]) -> str:
             blocks.append(f"{label}: {scalar_to_text(field.value)}")
     return "\n\n".join(blocks)
 
+# ============================================================
 # 4. RESOLUCIÓN DE CAMPOS SEGÚN EL PLAN
+# ============================================================
 
 def collect_fields(node: SplitNode) -> list[str]:
     # Recoge todos los campos declarados en un nodo y en sus descencientes.
@@ -424,7 +421,9 @@ def resolve_fields(
                 )
     return result
 
+# ============================================================
 # 5. CONTADORES DE TOKENS
+# ============================================================
 
 def approximate_token_counter(text: str) -> int:
     # Contador aproximado que considera cada palabra como un token
@@ -442,7 +441,9 @@ def make_huggingface_token_counter(tokenizer: Any) -> Callable[[str], int]:
         )["input_ids"])
     return count_tokens
 
+# ============================================================
 # 6. CHUNKER RECURSIVO
+# ============================================================
 
 class HierarchicalJSONChunker:
     # Divide un documento JSON utilizando DOCUMENT_PLAN

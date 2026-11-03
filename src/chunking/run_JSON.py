@@ -1,25 +1,15 @@
 """
 Ejecuta el chunking jerárquico para documentos JSON estructurados.
 
-Este script:
-1. Carga los documentos JSON desde data/processed/json.
-2. Detecta automáticamente la tipología documental (paper, guideline,
-   ficha técnica) según la estructura y los campos del JSON.
-3. Selecciona el document plan correspondiente.
-4. Aplica el HierarchicalJSONChunker, que:
-   - respeta la estructura del JSON,
-   - evita cortes peligrosos,
-   - genera chunks semánticos y trazables,
-   - añade metadatos como nivel, grupo, rutas JSON y límites de tokens.
-5. Guarda los chunks en
-   la ruta de salida configurada.
-6. Guarda las métricas y el resumen junto a los chunks.
-7. Genera un summary.csv con una fila por documento.
+Carga las rutas y los parámetros desde el archivo de configuración, detecta
+el tipo de cada documento y aplica el plan de chunking correspondiente.
+Puede reutilizar resultados en caché cuando el contenido y los parámetros
+relevantes coinciden; guarda los chunks, las métricas y el resumen CSV en las
+rutas configuradas. El procesamiento de documentos puede ejecutarse en paralelo.
 """
 
-
 # ============================================================
-# IMPORTS GENERALES
+# IMPORTS
 # ============================================================
 
 import json
@@ -42,13 +32,14 @@ from chunking.utilities import (
     create_token_counter,
     save_json,
 )
+
+# Caché
 from chunking.chunk_cache import cache_fingerprint, load_cached_artifacts
+
+# Configuración
 from chunking.config import load_config, resolve_config_path
 
-# ============================================================
 # JSON-CHUNKER
-# ============================================================
-
 from chunking.chunkers.json import (
     HierarchicalJSONChunker,
     get_document_config,
@@ -77,9 +68,9 @@ def detect_document_type(
     data: Dict[str, Any],
     source_path: str,
 ) -> str:
+    # La firma específica identifica primero las fichas técnicas; si no coincide,
+    # se usa document_type para guidelines y article_type para papers.
     keys = set(data)
-    # La firma específica de ficha técnica tiene prioridad sobre los campos
-    # genéricos que puedan aparecer en otros tipos de documento.
     if FICHA_TECNICA_SIGNATURE.issubset(keys):
         return "ficha_tecnica"
 
@@ -334,8 +325,9 @@ def main(
     else:
         retained_summary = previous_summary
 
-    # 3. Reutilizar resultados solo si coinciden el contenido y los parámetros;
-    # así se reprocesan documentos cuando cambia la entrada o la configuración.
+    # La huella incluye el contenido y todos los parámetros que afectan al
+    # chunking; si cambia alguno, se reprocesa el documento en vez de reutilizar
+    # resultados obsoletos.
     pending_documents = []
     cache_fingerprints = {}
     for doc in documents:
@@ -405,6 +397,7 @@ def main(
                 metrics_dir,
             )
     elif pending_documents:
+        # La RAM es compartida entre workers, así que no se mide por documento.
         with ThreadPoolExecutor(
             max_workers=workers,
             initializer=_initialize_worker,

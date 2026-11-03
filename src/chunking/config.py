@@ -1,11 +1,19 @@
 """Carga de configuración y resolución de rutas del chunking."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
 
+
+# ============================================================
+# CARGAR Y VALIDAR CONFIGURACIÓN
+# ============================================================
 
 def load_config(config_path: Path) -> dict[str, Any]:
     """Carga un archivo de configuración JSON cuyo nivel superior es un objeto."""
@@ -35,6 +43,10 @@ def load_config(config_path: Path) -> dict[str, Any]:
         )
     return config
 
+
+# ============================================================
+# RESOLVER RUTAS DE CONFIGURACIÓN
+# ============================================================
 
 def resolve_config_path(
     project_root: Path,

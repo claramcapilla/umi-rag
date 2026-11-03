@@ -1,13 +1,22 @@
 """Funciones auxiliares para validar resultados de chunking guardados."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+# ============================================================
+# CALCULAR LA HUELLA DE CACHÉ
+# ============================================================
 
 def cache_fingerprint(value: Any) -> str:
     """Crea una huella estable para datos de caché compatibles con JSON."""
+    # La ordenación de claves y los separadores compactos hacen determinista
+    # la serialización aunque cambie el orden o el formato del JSON.
     serialized = json.dumps(
         value,
         ensure_ascii=False,
@@ -16,6 +25,10 @@ def cache_fingerprint(value: Any) -> str:
     )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
+
+# ============================================================
+# CARGAR Y VALIDAR ARTEFACTOS EN CACHÉ
+# ============================================================
 
 def load_cached_artifacts(
     chunks_path: Path,
@@ -49,6 +62,8 @@ def load_cached_artifacts(
     ):
         return None
 
+    # Acepta la caché solo si ambos artefactos coinciden entre sí y con la
+    # huella actual del documento y de la configuración de chunking.
     if (
         chunks_result.get("_cache_fingerprint") != fingerprint
         or metrics_result.get("_cache_fingerprint") != fingerprint

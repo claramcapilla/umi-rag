@@ -1,5 +1,9 @@
 """Configuración del chunking JSON por tipo documental."""
 
+# ============================================================
+# IMPORTS
+# ============================================================
+
 from dataclasses import dataclass
 
 from chunking.chunkers.json.JSON_chunker import SplitNode
@@ -8,10 +12,17 @@ from chunking.chunkers.json.document_plan_guideline import DOCUMENT_PLAN_GL
 from chunking.chunkers.json.document_plan_paper import DOCUMENT_PLAN_PAPER
 
 
+# ============================================================
+# CONFIGURACIÓN POR TIPO DOCUMENTAL
+# ============================================================
+
 @dataclass(frozen=True)
 class DocumentConfig:
+    # Árbol que define cómo se agrupan semánticamente los campos del documento.
     plan: SplitNode
+    # Rutas de listas que deben mantenerse completas, aunque excedan el tamaño objetivo.
     indivisible_list_paths: frozenset[str]
+    # Rutas cuyos valores se copian al contexto de todos los chunks del documento.
     context_fields: tuple[str, ...]
 
 
@@ -46,6 +57,10 @@ DOCUMENT_CONFIGS = {
     ),
 }
 
+
+# ============================================================
+# OBTENER CONFIGURACIÓN
+# ============================================================
 
 def get_document_config(document_type: str) -> DocumentConfig:
     """Devuelve la configuración de chunking para el tipo documental."""

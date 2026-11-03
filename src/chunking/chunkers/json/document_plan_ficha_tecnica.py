@@ -1,9 +1,15 @@
+"""Plan jerárquico para dividir fichas técnicas de medicamentos.
+
+Agrupa la información por secciones clínicas y administrativas. Las hojas del
+árbol señalan las rutas JSON que se incorporan a cada grupo de chunks.
+"""
+
 from chunking.chunkers.json.JSON_chunker import SplitNode
 
 DOCUMENT_PLAN_FC = SplitNode(
     name="complete_document",
     children=[
-        # identification: medicine_name, pharmaceutical_form, composition
+        # Identidad del medicamento y composición declarada.
         SplitNode(
             name="identification",
             children=[
@@ -36,73 +42,65 @@ DOCUMENT_PLAN_FC = SplitNode(
             ]
         ),
 
-        # indications
+        # Uso clínico: indicaciones, pauta y situaciones en que no debe usarse.
         SplitNode(
             name="indications",
             fields=["indications"]
         ),
 
-        # posology
         SplitNode(
             name="posology",
             fields=["posology"]
         ),
 
-        # contraindications
         SplitNode(
             name="contraindications",
             fields=["contraindications"]
         ),
 
-        # warnings
+        # Precauciones y efectos relevantes para el tratamiento y la seguridad.
         SplitNode(
             name="warnings_and_precautions",
             fields=["warnings_and_precautions"]
         ),
 
-        # interactions
         SplitNode(
             name="interactions",
             fields=["interactions"]
         ),
 
-        # pregnancy
         SplitNode(
             name="pregnancy_and_lactation",
             fields=["pregnancy_and_lactation"]
         ),
 
-        # driving
         SplitNode(
             name="effects_on_driving",
             fields=["effects_on_driving"]
         ),
 
-        # adverse_reactions
         SplitNode(
             name="adverse_reactions",
             fields=["adverse_reactions"]
         ),
 
-        # overdose
+        # Información farmacológica del medicamento.
         SplitNode(
             name="overdose",
             fields=["overdose"]
         ),
 
-        # pharmacodynamics
         SplitNode(
             name="pharmacodynamics",
             fields=["pharmacodynamics"]
         ),
 
-        # pharmacokinetics
         SplitNode(
             name="pharmacokinetics",
             fields=["pharmacokinetics"]
         ),
 
-        # pharmaceutical
+        # Propiedades farmacéuticas, conservación y manipulación.
         SplitNode(
             name="pharmaceutical",
             children=[
@@ -148,7 +146,7 @@ DOCUMENT_PLAN_FC = SplitNode(
             ]
         ),
 
-        # marketing: marketing_authorisation_holder, marketing_authorisation_number
+        # Titular y número de autorización de comercialización.
         SplitNode(
             name="marketing",
             children=[
@@ -163,8 +161,8 @@ DOCUMENT_PLAN_FC = SplitNode(
             ]
         ),
 
-        # administration: active_ingredient, strength, route_of_administration
-        # Hoja única: por seguridad clínica, estos tres campos no se separan
+        # Mantiene juntos principio activo, concentración y vía de administración
+        # para que la información esencial de administración conserve su contexto.
         SplitNode(
             name="administration",
             fields=[
@@ -174,7 +172,7 @@ DOCUMENT_PLAN_FC = SplitNode(
             ]
         ),
 
-        # reimbursement
+        # Datos de financiación, presentaciones y códigos nacionales consultados.
         SplitNode(
             name="reimbursement",
             children=[

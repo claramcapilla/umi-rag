@@ -1,3 +1,5 @@
+"""Utilidades para guardar resultados y calcular estadísticas del chunking."""
+
 # ============================================================
 # IMPORTS
 # ============================================================
@@ -9,9 +11,8 @@ from typing import Any, Callable, Dict, List
 import numpy as np
 from transformers import AutoTokenizer
 
-
 # ============================================================
-# FUNCIÓN PARA GUARDAR ARCHIVOS JSON
+# GUARDAR ARCHIVOS JSON
 # ============================================================
 
 def save_json(
@@ -61,9 +62,8 @@ def save_json(
             f"{output_path}"
         ) from error
 
-
 # ============================================================
-# FUNCIÓN PARA CREAR EL CONTADOR DE TOKENS
+# CREAR EL CONTADOR DE TOKENS
 # ============================================================
 
 def create_tokenizer(
@@ -113,7 +113,7 @@ def create_token_counter(
 
 
 # ============================================================
-# FUNCIÓN PARA CALCULAR ESTADÍSTICAS
+# CALCULAR ESTADÍSTICAS
 # ============================================================
 
 def calculate_stats(

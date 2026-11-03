@@ -1,4 +1,8 @@
-"""Chunking jerárquico para documentos JSON estructurados."""
+"""Chunking jerárquico para documentos JSON estructurados.
+
+Reexporta el chunker, sus estructuras de datos y los planes y configuraciones
+disponibles para cada tipo documental.
+"""
 
 from chunking.chunkers.json.JSON_chunker import (
     Chunk,

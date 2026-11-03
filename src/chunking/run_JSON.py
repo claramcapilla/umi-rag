@@ -68,8 +68,14 @@ def detect_document_type(
     data: Dict[str, Any],
     source_path: str,
 ) -> str:
-    # La firma específica identifica primero las fichas técnicas; si no coincide,
-    # se usa document_type para guidelines y article_type para papers.
+    """Detecta el tipo documental mediante la estructura y los campos declarados.
+
+    Prioriza la firma de ficha técnica; en su ausencia reconoce guías por
+    ``document_type`` y artículos por ``article_type``.
+
+    Raises:
+        ValueError: Si no se puede detectar el tipo o hay señales incompatibles.
+    """
     keys = set(data)
     if FICHA_TECNICA_SIGNATURE.issubset(keys):
         return "ficha_tecnica"
@@ -113,8 +119,7 @@ def _initialize_worker(
     model_name: str,
     add_special_tokens: bool,
 ) -> None:
-    # Cada hilo mantiene su propio contador para evitar compartir estado
-    # mutable del tokenizer entre workers.
+    """Inicializa en el hilo actual un contador de tokens propio."""
     tokenizer = create_tokenizer(model_name)
     _WORKER_CONTEXT.token_counter = create_token_counter(
         tokenizer,
@@ -128,6 +133,14 @@ def _process_document(
     max_tokens: int,
     measure_ram: bool,
 ) -> Dict[str, Any]:
+    """Genera chunks y métricas para un documento usando el worker actual.
+
+    ``measure_ram`` controla si se miden y registran los valores de RAM del
+    proceso; cuando es falso, esos campos quedan como ``None``.
+
+    Returns:
+        Diccionario con ``chunks``, ``original_token_count`` y ``stats``.
+    """
     token_counter = _WORKER_CONTEXT.token_counter
     original_token_count = token_counter(doc["full_text"])
     document_config = get_document_config(doc["document_type"])
@@ -177,6 +190,12 @@ def _process_document(
 
 
 def _positive_int(value: str) -> int:
+    """Valida un argumento CLI que debe ser un entero positivo.
+
+    Raises:
+        argparse.ArgumentTypeError: Si el valor no es un entero mayor o igual
+            que uno.
+    """
     try:
         parsed = int(value)
     except ValueError as error:
@@ -198,6 +217,23 @@ def main(
     use_cache: bool = True,
     config_file: Path = DEFAULT_CONFIG,
 ) -> None:
+    """Ejecuta el chunking JSON y guarda resultados, métricas y resumen.
+
+    Carga y valida la configuración, detecta los documentos de entrada,
+    reutiliza artefactos cuya huella coincide y procesa el resto con el número
+    de workers efectivo. Las rutas relativas de configuración se resuelven
+    desde la raíz del proyecto.
+
+    Args:
+        workers_override: Máximo de workers que sustituye al valor configurado.
+            Si es ``None``, se usa ``execution.workers``.
+        use_cache: Si es falso, reprocesa todos los documentos sin leer caché.
+        config_file: Ruta del archivo de configuración del chunker.
+
+    Raises:
+        FileNotFoundError: Si falta el directorio de entrada o no hay JSONs.
+        TypeError, ValueError: Si los documentos o la configuración no son válidos.
+    """
     print("=" * 70)
     print("INICIO DE LA EJECUCIÓN (JSON)")
     print("=" * 70)
@@ -468,6 +504,11 @@ def _save_document_result(
     chunks_dir: Path,
     metrics_dir: Path,
 ) -> None:
+    """Persiste chunks y métricas de un documento y añade sus métricas al resumen.
+
+    Los resultados se serializan a JSON e incluyen la huella usada para
+    validar su reutilización en ejecuciones posteriores.
+    """
     print(f"\nProcesando: {doc['file_name']}")
     chunks = processed["chunks"]
     serialized = [asdict(chunk) for chunk in chunks]
@@ -521,6 +562,7 @@ def _save_document_result(
 # ============================================================
 
 def cli() -> None:
+    """Define y procesa los argumentos de línea de comandos del chunker JSON."""
     parser = argparse.ArgumentParser(
         description="Ejecuta el chunking jerárquico de documentos JSON."
     )

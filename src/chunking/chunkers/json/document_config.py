@@ -1,4 +1,9 @@
-"""Configuración del chunking JSON por tipo documental."""
+"""Define planes y reglas de chunking para cada tipo documental JSON.
+
+Cada configuración selecciona el árbol semántico que organiza los campos,
+las listas que no se deben dividir por elementos y los campos que se copian
+como contexto a los metadatos de todos los chunks.
+"""
 
 # ============================================================
 # IMPORTS
@@ -18,11 +23,18 @@ from chunking.chunkers.json.document_plan_paper import DOCUMENT_PLAN_PAPER
 
 @dataclass(frozen=True)
 class DocumentConfig:
-    # Árbol que define cómo se agrupan semánticamente los campos del documento.
+    """Reglas inmutables de chunking asociadas a un tipo de documento.
+
+    Attributes:
+        plan: Árbol semántico de campos y subdivisiones del documento.
+        indivisible_list_paths: Rutas relativas a la raíz cuyas listas se
+            mantienen completas aunque superen el tamaño objetivo.
+        context_fields: Rutas de valores que se incluyen en los metadatos de
+            cada chunk, sin agregarlos al texto vectorizado.
+    """
+
     plan: SplitNode
-    # Rutas de listas que deben mantenerse completas, aunque excedan el tamaño objetivo.
     indivisible_list_paths: frozenset[str]
-    # Rutas cuyos valores se copian al contexto de todos los chunks del documento.
     context_fields: tuple[str, ...]
 
 
@@ -63,7 +75,16 @@ DOCUMENT_CONFIGS = {
 # ============================================================
 
 def get_document_config(document_type: str) -> DocumentConfig:
-    """Devuelve la configuración de chunking para el tipo documental."""
+    """Devuelve las reglas de chunking para un tipo documental admitido.
+
+    Args:
+        document_type: Clave de tipo documental, por ejemplo ``"paper"``,
+            ``"guideline"`` o ``"ficha_tecnica"``.
+
+    Raises:
+        ValueError: Si no hay una configuración para ese tipo. El mensaje
+            incluye los tipos admitidos.
+    """
     try:
         return DOCUMENT_CONFIGS[document_type]
     except KeyError as error:

@@ -21,8 +21,12 @@ import re
 
 @dataclass
 class Chunk:
-    # Representa los chunks generados por el algoritmo, con información
-    # sobre su procedencia dentro del JSON y tamaño
+    """Texto de un segmento del documento y metadatos de su origen y tamaño.
+
+    ``json_paths`` identifica los campos fuente y ``metadata`` contiene
+    detalles adicionales del chunk, incluidos los límites de tokens aplicados.
+    """
+
     text: str # texto del chunk
     block: str # nombre de la clave raíz del documento
     group_name: str # nombre del nodo en SplitNode
@@ -35,16 +39,20 @@ class Chunk:
 
 @dataclass
 class SplitNode:
-    # Representa los nodos del árbol DOCUMENT_PLAN. Un nodo puede contener
-    # fields (rutas JSON) o children (subdivisiones semánticas)
+    """Nodo del plan semántico que agrupa rutas JSON o nodos hijos.
+
+    Un nodo puede declarar ``fields``, ``children`` o ambos. Las rutas de campo
+    son relativas a la raíz interna del documento y usan puntos como separador.
+    """
+
     name: str
     fields: list[str] = field(default_factory=list)
     children: list["SplitNode"] = field(default_factory=list)
 
 @dataclass(frozen=True)
 class ResolvedField:
-    # Representa los campos de DOCUMENT_PLAN que ya han sido localizados
-    # dentro del JSON
+    """Campo de un plan ya localizado dentro de un documento JSON."""
+
     name: str
     path: tuple[str | int, ...]
     value: Any
@@ -58,15 +66,11 @@ class ResolvedField:
 # ============================================================
 
 def is_present(value: Any) -> bool:
-    # Comprueba recursivamente si un valor JSON contiene información real.
+    """Indica si un valor JSON contiene información que deba conservarse.
 
-    # Se consideran vacíos:
-    # - None;
-    # - cadenas vacías o con espacios;
-    # - listas cuyos elementos estén todos vacíos;
-    # - diccionarios cuyos valores estén todos vacíos.
-
-    # Los valores False y 0 se consideran información válida.
+    ``None``, cadenas en blanco y contenedores vacíos (o con solo valores
+    vacíos) no están presentes; los escalares como ``0`` y ``False`` sí.
+    """
     if value is None:
         return False
     if isinstance(value, str):
@@ -81,17 +85,15 @@ def is_present(value: Any) -> bool:
             is_present(item)
             for item in value
         )
-    # Números, booleanos y otros valores escalares
-    # se consideran información presente.
     return True
 
 def humanize(name: str) -> str:
-    # Convierte las clave-valor del JSON en etiquetas legibles
+    """Convierte una clave JSON en una etiqueta legible para el texto del chunk."""
     return name.replace("_", " ").strip().capitalize()
 
 
 def scalar_to_text(value: Any) -> str:
-    # Convierte los valores y booleanos en texto
+    """Convierte un escalar a texto y representa booleanos como ``Sí`` o ``No``."""
     if isinstance(value, bool):
         return "Sí" if value else "No"
     return str(value)
@@ -106,8 +108,11 @@ def find_matching_key(
     value: dict[str, Any],
     candidates: set[str],
 ) -> str | None:
-    # Busca dentro de un diccionario una clave coincidente,
-    # ignorando mayúsculas, minúsculas y espacios exteriores.
+    """Busca la primera clave candidata ignorando mayúsculas y espacios externos.
+
+    Returns:
+        La clave original del diccionario si coincide, o ``None``.
+    """
     for key in value:
         if (
             isinstance(key, str)
@@ -120,15 +125,15 @@ def find_matching_key(
 def detect_explicit_table(
     value: Any,
 ) -> tuple[str, str] | None:
-    # Comprueba si un valor parece una tabla explícita.
+    """Detecta tablas con listas de columnas y filas.
 
-    # Para considerarlo tabla debe:
-    # - ser un diccionario;
-    # - contener una clave de columnas;
-    # - contener una clave de filas;
-    # - almacenar columnas y filas como listas.
+    Las claves admitidas son ``columns``/``columnas`` y ``rows``/``filas``.
+    La comparación no distingue mayúsculas ni espacios externos.
 
-    # Devuelve las claves reales encontradas.
+    Returns:
+        Las claves reales de columnas y filas, o ``None`` si la estructura no
+        cumple el formato de tabla esperado.
+    """
     if not isinstance(value, dict):
         return None
     column_key = find_matching_key(
@@ -153,8 +158,7 @@ def _append_table_cell(
     cell: Any,
     indent: int,
 ) -> None:
-    # Añade una celda de tabla manteniendo explícita
-    # la relación entre el nombre de columna y su valor.
+    """Añade una celda formateada y conserva la asociación columna-valor."""
     prefix = " " * indent
     label = humanize(column_name)
     # Una cadena con saltos de línea se interpreta
@@ -207,10 +211,15 @@ def table_to_lines(
     table: dict[str, Any],
     indent: int = 0,
 ) -> list[str]:
-    # Convierte una tabla en texto explícito por filas.
+    """Serializa una tabla en líneas, repitiendo el nombre de cada columna.
 
-    # En cada fila se repiten los nombres de las columnas
-    # para mantener la relación columna-valor.
+    Conserva los campos adicionales de la tabla y admite filas como listas,
+    diccionarios o escalares.
+
+    Returns:
+        Líneas de texto de la tabla; devuelve una lista vacía si no es una tabla
+        explícita válida.
+    """
     detected_keys = detect_explicit_table(table)
     if detected_keys is None:
         return []
@@ -328,11 +337,11 @@ def table_to_lines(
     return lines
 
 def value_to_lines(value: Any, indent: int = 0) -> list[str]:
-    # Convierte un valor JSON en líneas de texto según el tipo de elemento.
-    # Los diccionarios se serializan completos, y si tienen dentro otros elementos
-    # se incluyen con sangría.
-    # Los elementos de una lista se convierten en guiones.
-    # Los textos, escalares y booleanos se convierten en una línea.
+    """Serializa recursivamente un valor JSON a líneas con sangría.
+
+    Omite valores vacíos, identifica tablas explícitas y representa los
+    elementos de listas como viñetas.
+    """
     prefix = " " * indent
 
     if not is_present(value):
@@ -370,8 +379,7 @@ def value_to_lines(value: Any, indent: int = 0) -> list[str]:
 
 
 def render_fields(fields: list[ResolvedField]) -> str:
-    # Convierte una lista de campos en el texto del chunk.
-    # Las distintas parejas clave-valor se sepran por una línea en blanco
+    """Renderiza campos localizados como bloques clave-valor separados por líneas."""
     blocks: list[str] = []
     for field in fields:
         label = humanize(field.name)
@@ -388,8 +396,7 @@ def render_fields(fields: list[ResolvedField]) -> str:
 # ============================================================
 
 def collect_fields(node: SplitNode) -> list[str]:
-    # Recoge todos los campos declarados en un nodo y en sus descencientes.
-    # Agrupa todo el contenido representado en la misma rama de DOCUMENT_PLAN
+    """Recoge, sin duplicados, las rutas declaradas en un nodo y sus descendientes."""
     fields = list(node.fields)
     for child in node.children:
         fields.extend(collect_fields(child))
@@ -399,9 +406,11 @@ def resolve_fields(
     node: SplitNode,
     data: dict[str, Any],
 ) -> list[ResolvedField]:
-    # Localiza en el JSON todos los campos pertenecientes a un nodo según su
-    # ruta exacta relativa a la raíz. De esta forma, campos repetidos no se confunden
-    # si aparecen en ramas distintas
+    """Resuelve las rutas de un nodo contra un objeto JSON.
+
+    Solo devuelve rutas existentes cuyos valores estén presentes. Las rutas se
+    interpretan respecto a ``data`` y sus componentes se separan por puntos.
+    """
     result: list[ResolvedField] = []
     for field_path in collect_fields(node):
         path = tuple(field_path.split("."))
@@ -426,13 +435,14 @@ def resolve_fields(
 # ============================================================
 
 def approximate_token_counter(text: str) -> int:
-    # Contador aproximado que considera cada palabra como un token
+    """Estima tokens contando palabras separadas por espacios."""
     return len(text.split())
 
 def make_huggingface_token_counter(tokenizer: Any) -> Callable[[str], int]:
-    # Construye una función que cuenta tokens utilizando un tokenizador de
-    # Hugging Face. Se debe utilizar el tokenizador del modelo de embeddings
-    # cuando se conozca
+    """Crea un contador que mide tokens con el tokenizer de Hugging Face.
+
+    El contador incluye tokens especiales y desactiva el truncamiento.
+    """
     def count_tokens(text: str) -> int:
         return len(tokenizer(
             text,
@@ -446,63 +456,21 @@ def make_huggingface_token_counter(tokenizer: Any) -> Callable[[str], int]:
 # ============================================================
 
 class HierarchicalJSONChunker:
-    # Divide un documento JSON utilizando DOCUMENT_PLAN
+    """Divide documentos JSON según un plan semántico y límites de tokens.
 
-    # 1. Determina la raíz del documento: utiliza root_field si se proporciona;
-    #    si no, detecta automáticamente una única clave exterior
+    El plan fuerza una primera subdivisión por sus hijos directos. Las ramas
+    que superan ``target_tokens`` se subdividen recursivamente; los campos que
+    no están cubiertos por el plan también se conservan. ``max_tokens`` es un
+    límite absoluto: los chunks que lo superan se dividen mediante fallback,
+    por filas en tablas simples o por unidades de texto en los demás casos.
 
-    # 2. Procesa obligatoriamente todos los hijos del primer nivel (nunca se genera
-    #    el documento completo como un chunk)
-
-    # 3. Localiza los campos mediante sus rutas JSON relativas a la raíz para 
-    #    evitar confusión ante el mismo nombre en distintas ramas
-
-    # 4. Ignora valores sin contenido real, como None, cadenas vacías, listas con 
-    #    elementos vacíos o diccionarios con elementos vacíos. Los valores 0 y False
-    #    se consideran información válida
-
-    # 5. Se utiliza target_tokens como límite recomendado para la longitud del chunk.
-    #    - Si una rama no supera target tokens, se conserva completa
-    #    - Si lo supera y tiene hijos, se generan todos sus hijos directos y cada uno
-    #      se vuelve a evaluar recursivamente
-    #    - Solo se continúa descendiendo por las ramas que superen target_tokens
-
-    # 6. Una pareja clave-valor escalar o cuyo valor sea un diccionario se considera
-    #    indivisible aunque supere target_tokens por sí misma
-
-    # 7. Una pareja clave-lista que supera target_tokens se divide en un chunk independiente
-    #    para cada elemento de la lista, conservando el nombre de la clave original, y 
-    #    su índice se añade a la ruta JSON en los metadatos. Si el elemento es un
-    #    diccionario, permanece indivisible
-
-    # 8. Las listas incluidas en indivisible_list_paths nunca se dividen por
-    #    elementos, aunque superen target_tokens
-
-    # 9. Los diccionarios que contienen claves de filas y columnas se reconocen
-    #    como tablas explícitas, y se serializan por filas repitiendo los nombres de las
-    #    columnas para conservar la relación colúmna-valor. La tabla se considera 
-    #    un diccionario indivisible
-
-    # 10. max_tokens representa el límite absoluto admitido por el modelo de embeddings,
-    #     y no se utiliza para la división jerárquica, solo se marca como metadato para
-    #     un procesamiento posterior 
-
-    # 11. En cada chunk se indica el número de tokens, si supera el tamaño recomendado
-    #     y el límite del modelo, las rutas JSON y el grupo del árbol documental al que pertenece
-
-    # 12. El contenido presente en el JSON pero no incluido en DOCUMENT_PLAN se conserva
-    #     bajo el grupo "unmapped_content"
-
-    # 13. El conteo de tokens se realiza mediante la función token_counter proporcionada
-
-    # 14. Los campos indicados en context_fields (por ejemplo, el DOI de un paper o el
-    #     nombre de un medicamento) se copian en metadata["context"] de todos los chunks
-    #     del documento para identificar su procedencia. No se añaden al texto del chunk,
-    #     por lo que no cuentan como tokens ni influyen en el embedding
-
-    # 15. Si una tabla supera max_tokens, se divide por filas completas y cada parte
-    #     repite la cabecera (título, etc.). Si no tiene esa forma, se usa el fallback
-    #     por oraciones
+    Los valores vacíos se omiten, mientras que ``0`` y ``False`` se conservan.
+    Los escalares y diccionarios no se fragmentan; las listas que superan el
+    objetivo se separan por elementos, salvo las rutas protegidas. Las tablas
+    explícitas se serializan por filas con sus nombres de columna. El contenido
+    no cubierto por el plan se agrupa como ``unmapped_content``. Los campos de
+    contexto se añaden a los metadatos, no al texto que se vectoriza.
+    """
 
     def __init__(
         self,
@@ -514,6 +482,21 @@ class HierarchicalJSONChunker:
         indivisible_list_paths: set[str] | None = None,
         context_fields: list[str] | None = None,
     ) -> None:
+        """Configura el plan, los límites de tokens y las reglas por documento.
+
+        Args:
+            target_tokens: Tamaño recomendado para los chunks.
+            max_tokens: Límite absoluto usado para activar el fallback.
+            token_counter: Función que devuelve el número de tokens de un texto.
+            document_plan: Árbol de campos y grupos semánticos.
+            root_field: Clave exterior que se usará como raíz, si se especifica.
+            indivisible_list_paths: Rutas relativas cuyas listas no se dividen.
+            context_fields: Rutas copiadas a los metadatos de cada chunk.
+
+        Raises:
+            ValueError: Si los límites no son positivos o el objetivo supera
+                el límite máximo.
+        """
         if target_tokens <= 0:
             raise ValueError(
                 "target_tokens debe ser mayor que cero."
@@ -531,16 +514,30 @@ class HierarchicalJSONChunker:
         self.token_counter = token_counter
         self.document_plan = document_plan
         self.root_field = root_field
-        # Rutas de listas que nunca deben dividirse por elementos.
-        # Se utiliza un conjunto para que la búsqueda sea eficiente.
         self.indivisible_list_paths = set(
             indivisible_list_paths or []
         )
-        # Rutas de los campos del documento que se copian como contexto
-        # en los metadatos de todos los chunks.
         self.context_fields = list(dict.fromkeys(context_fields or []))
 
     def chunk_document(self, document: dict[str, Any]) -> list[Chunk]:
+        """Divide un documento y devuelve sus chunks con metadatos de origen.
+
+        Incluye las ramas presentes que no estén descritas por el plan, aplica
+        el fallback a los chunks sobre ``max_tokens`` y añade el contexto
+        configurado a los metadatos.
+
+        Args:
+            document: Objeto JSON que se va a dividir.
+
+        Returns:
+            Lista de chunks; un objeto vacío produce una lista vacía.
+
+        Raises:
+            TypeError: Si ``document`` no es un diccionario.
+            KeyError: Si se configuró un ``root_field`` que no existe.
+            ValueError: Si el fallback no puede representar el contenido
+                respetando el límite de tokens.
+        """
         if not isinstance(document, dict):
             raise TypeError("El documento debe ser un diccionario.")
         if not document:
@@ -548,9 +545,6 @@ class HierarchicalJSONChunker:
         block, data = self._get_root(document)
         planned = resolve_fields(self.document_plan, data)
         chunks: list[Chunk] = []
-        # El nodo raiz document solo se usa como contenedor organizativo.
-        # El algoritmo empieza directamente por todos sus hijos, haciendo
-        # obligatoriamente la primera subdivisión
         for child in self.document_plan.children:
             chunks.extend(
                 self._split(
@@ -560,7 +554,6 @@ class HierarchicalJSONChunker:
                     level=1
                 )
             )
-        # Busca las ramas del JSON que no están incluidas en ningún campo del DOCUMENT_PLAM
         uncovered = self._find_uncovered(data, [field.path for field in planned])
         if uncovered:
             chunks.extend(self._pack_fields(
@@ -570,8 +563,6 @@ class HierarchicalJSONChunker:
                 level=1,
             ))
 
-        # Fallback aplicado solo a los fragmentos que exceden max_tokens.
-        # Las agrupaciones del DOCUMENT_PLAN no cambian.
         final_chunks: list[Chunk] = []
         for chunk in chunks:
             if chunk.token_count > self.max_tokens:
@@ -579,8 +570,6 @@ class HierarchicalJSONChunker:
             else:
                 final_chunks.append(chunk)
 
-        # El contexto se añade al final para que también lo reciban los chunks
-        # generados por el fallback y por unmapped_content.
         context = self._resolve_context(data)
         if context:
             for chunk in final_chunks:
@@ -593,11 +582,12 @@ class HierarchicalJSONChunker:
     FALLBACK_OVERLAP_RATIO = 0.1
 
     def _split_oversized_chunk(self, original: Chunk) -> list[Chunk]:
-        """Fallback por oraciones con mínimo de partes, equilibrio y overlap.
+        """Divide un chunk que supera el límite absoluto del modelo.
 
-        Si una oración supera el límite, se divide primero por palabras y,
-        solo si una palabra también excede el límite, por caracteres.
-        No se trunca contenido ni se divide un chunk que ya cabe.
+        Las tablas simples se dividen por filas completas con cabecera repetida.
+        En otros textos se usan unidades de oración, palabras y, si hace falta,
+        caracteres. La cobertura principal conserva todo el texto de entrada;
+        los fragmentos se equilibran y pueden solaparse.
         """
         limit = self.max_tokens
         # Un margen relativo pequeño evita ocupar innecesariamente el tope.
@@ -734,7 +724,10 @@ class HierarchicalJSONChunker:
         first = next((i for i, m in enumerate(markers) if m), None)
         if first is None:
             return None
-        row_indent = len(markers[first].group(1))
+        first_marker = markers[first]
+        if first_marker is None:
+            return None
+        row_indent = len(first_marker.group(1))
 
         # Separa cabecera, filas (con su número) y líneas finales.
         header = lines[:first]
@@ -814,7 +807,11 @@ class HierarchicalJSONChunker:
         return output
 
     def _fallback_units(self, text: str, limit: int) -> list[str]:
-        """Unidades de oraciones que conservan exactamente todo el texto."""
+        """Separa el texto en unidades ajustadas al límite sin perder caracteres.
+
+        Conserva líneas estructuradas y separadores originales; las unidades
+        demasiado largas se subdividen por palabras o por caracteres.
+        """
         # Las líneas estructuradas del JSON se mantienen independientes.
         # Para texto narrativo se buscan límites de oración tras .!? y espacio.
         lines = text.splitlines(keepends=True)
@@ -832,7 +829,13 @@ class HierarchicalJSONChunker:
         return units
 
     def _fallback_split_long_unit(self, text: str, limit: int) -> list[str]:
-        """Trocea una oración demasiado larga por palabras; después caracteres."""
+        """Divide una unidad larga por palabras y luego por caracteres.
+
+        La concatenación del resultado reproduce exactamente ``text``.
+
+        Raises:
+            ValueError: Si ni siquiera un carácter cabe dentro de ``limit``.
+        """
         pieces = re.findall(r"\s+|\S+", text)
         out: list[str] = []
         current = ""
@@ -867,9 +870,11 @@ class HierarchicalJSONChunker:
         return out
 
     def _resolve_context(self, data: dict[str, Any]) -> dict[str, Any]:
-        # Localiza en el documento los campos de context_fields. La clave es
-        # la ruta completa del campo (por ejemplo, "metadata.title"). Los campos
-        # ausentes o vacíos (como un DOI null) no se incluyen.
+        """Resuelve los campos de contexto presentes en el documento.
+
+        Devuelve un diccionario con rutas completas como claves y valores del
+        JSON como contenido; omite las rutas ausentes o vacías.
+        """
         if not self.context_fields:
             return {}
         resolved = resolve_fields(
@@ -882,7 +887,16 @@ class HierarchicalJSONChunker:
         }
 
     def _get_root(self, document: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        # Determina qué parte del JSON debe tratarse como raíz
+        """Determina el bloque raíz y los datos que recorrerá el plan.
+
+        Usa ``root_field`` si se configuró; de lo contrario, desenvuelve una
+        única clave exterior cuyo valor sea un objeto. En los demás casos usa
+        el documento completo.
+
+        Raises:
+            KeyError: Si la clave raíz configurada no existe.
+            TypeError: Si la raíz seleccionada no contiene un objeto.
+        """
         if self.root_field is not None:
             if self.root_field not in document:
                 raise KeyError(f"La clave raíz '{self.root_field}' no existe.")
@@ -906,8 +920,7 @@ class HierarchicalJSONChunker:
         node: SplitNode,
         level: int,
     ) -> list[Chunk]:
-        # Evalúa un nodo del árbol y decide si debe conservarse completo
-        # o dividirse mediante sus hijos
+        """Evalúa un nodo del plan y decide si conservarlo o subdividirlo."""
         fields = resolve_fields(node, data)
         if not fields:
             return []
@@ -952,13 +965,11 @@ class HierarchicalJSONChunker:
         fields: list[ResolvedField],
         level: int,
     ) -> list[Chunk]:
-        # Agrupa campos completos respetando target_tokens.
+        """Agrupa campos completos sin superar el tamaño objetivo cuando es posible.
 
-        # Reglas:
-        # - Los campos escalares y diccionarios son indivisibles.
-        # - Las listas excesivas se dividen por elementos.
-        # - Las listas incluidas en indivisible_list_paths nunca
-        # se dividen, aunque superen target_tokens.
+        Las listas extensas se separan por elementos, salvo que su ruta esté en
+        ``indivisible_list_paths``; las parejas clave-valor no se fragmentan.
+        """
         chunks: list[Chunk] = []
         current: list[ResolvedField] = []
 
@@ -1056,10 +1067,9 @@ class HierarchicalJSONChunker:
         data: Any,
         covered_paths: list[tuple[str | int, ...]],
     ) -> list[ResolvedField]:
-        # Localiza las ramas del JSON que no aparecen en DOCUMENT_PLAN
+        """Localiza valores presentes no cubiertos por las rutas del plan."""
         result: list[ResolvedField] = []
         def visit(value: Any, path: tuple[str | int, ...]) -> None:
-            # Recorre recursivamente una rama del documento
             if any(path[:len(covered)] == covered for covered in covered_paths):
                 return
             has_covered_descendant = any(
@@ -1084,7 +1094,7 @@ class HierarchicalJSONChunker:
         fields: list[ResolvedField],
         level: int,
     ) -> Chunk:
-        # Construye el objeto chunk y calcula todos sus metadatos
+        """Construye un chunk y calcula texto, tokens, rutas y límites."""
         text = render_fields(fields)
         token_count = self.token_counter(text)
         exceeds_target = token_count > self.target_tokens
@@ -1112,8 +1122,7 @@ class HierarchicalJSONChunker:
 
     @staticmethod
     def _format_path(block: str, path: tuple[str | int, ...]) -> str:
-        # Convierte una ruta almacenada como tubla en una ruta JSON legible
-        # para guardar en los metadatos de cada chunk
+        """Formatea una ruta JSON relativa al bloque, incluidos índices de lista."""
         result = block
         for part in path:
             result += f"[{part}]" if isinstance(part, int) else f".{part}"

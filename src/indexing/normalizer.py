@@ -1,4 +1,11 @@
-"""Convierte las entradas de chunks admitidas a un esquema JSONL común."""
+"""Normaliza distintas salidas de chunking a un esquema JSONL común.
+
+Recorre los archivos JSONL canónicos y los resultados JSON del benchmark,
+conserva los metadatos útiles y construye IDs deterministas cuando convierte
+resultados de documentos. Proporciona funciones para iterar los registros,
+escribirlos en un archivo JSONL y volver a cargarlos; informa de entradas
+ausentes o inválidas en lugar de omitir chunks mal formados.
+"""
 
 # ============================================================
 # IMPORTS
@@ -23,6 +30,16 @@ def _normalise_record(
     source_file: Path | None = None,
     source_dir: Path | None = None,
 ) -> dict[str, Any]:
+    """Convierte un chunk canónico o de benchmark al esquema de indexación.
+
+    Cuando ``document`` no se proporciona, conserva los campos del chunk y
+    completa los metadatos mínimos. Para resultados de benchmark, combina los
+    datos del documento y el chunk y genera un ID determinista a partir de sus
+    metadatos y posición.
+
+    Raises:
+        ValueError: Si el chunk no contiene texto no vacío.
+    """
     relative_source = (
         source_file.relative_to(source_dir).as_posix()
         if source_file is not None and source_dir is not None
@@ -53,13 +70,17 @@ def _normalise_record(
 
     document_id = str(document.get("doc_id", f"source-{source_key}"))
     strategy = str(document.get("strategy", "unknown"))
-    format_name = next(
-        (
-            part
-            for part in reversed(source_file.parts)
-            if part.lower() in {"json", "markdown"}
-        ),
-        "unknown",
+    format_name = (
+        next(
+            (
+                part
+                for part in reversed(source_file.parts)
+                if part.lower() in {"json", "markdown"}
+            ),
+            "unknown",
+        )
+        if source_file is not None
+        else "unknown"
     )
     abbreviation = str(document.get("abbreviation", "unknown"))
     metadata = dict(chunk.get("metadata") or {})
@@ -88,7 +109,10 @@ def _normalise_record(
         "format": format_name,
         "document_type": str(document.get("document_type", "unknown")),
         "document_id": document_id,
-        "source_file": document.get("input_file", source_file.name),
+        "source_file": document.get(
+            "input_file",
+            source_file.name if source_file is not None else relative_source,
+        ),
         "source_path": document.get("source_path"),
         "strategy": strategy,
         "strategy_abbreviation": abbreviation,
@@ -104,7 +128,19 @@ def _normalise_record(
 # ============================================================
 
 def iter_normalized_chunks(source_dir: Path) -> Iterator[dict[str, Any]]:
-    """Recorre JSONL canónicos y JSON chunk_results del benchmark."""
+    """Recorre y normaliza chunks JSONL canónicos y resultados JSON de benchmark.
+
+    Los archivos se procesan de forma determinista por ruta; los registros
+    JSONL vacíos se ignoran.
+
+    Yields:
+        Cada chunk convertido al esquema común.
+
+    Raises:
+        FileNotFoundError: Si el directorio no existe o no contiene entradas
+            reconocibles.
+        ValueError: Si algún registro o chunk encontrado está mal formado.
+    """
     if not source_dir.is_dir():
         raise FileNotFoundError(f"No existe la carpeta de chunks: {source_dir}")
 
@@ -153,6 +189,14 @@ def iter_normalized_chunks(source_dir: Path) -> Iterator[dict[str, Any]]:
 # ============================================================
 
 def write_normalized_chunks(source_dir: Path, output_file: Path) -> int:
+    """Escribe en JSONL los chunks normalizados del directorio de entrada.
+
+    Crea el directorio padre de ``output_file`` si hace falta y reemplaza el
+    archivo de salida existente.
+
+    Returns:
+        Número de registros escritos.
+    """
     # Escribir a JSONL permite procesar registros individualmente y facilita
     # inspeccionar o reanudar fases posteriores.
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -165,6 +209,12 @@ def write_normalized_chunks(source_dir: Path, output_file: Path) -> int:
 
 
 def load_normalized_chunks(path: Path) -> list[dict[str, Any]]:
+    """Carga y valida los chunks de un archivo JSONL normalizado.
+
+    Raises:
+        FileNotFoundError: Si el archivo no existe.
+        ValueError: Si hay un registro inválido o el archivo no contiene chunks.
+    """
     # La indexación carga los registros ya normalizados y falla ante datos
     # incompletos en lugar de omitirlos silenciosamente.
     if not path.is_file():

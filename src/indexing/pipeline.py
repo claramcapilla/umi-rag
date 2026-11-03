@@ -1,4 +1,11 @@
-"""Orquesta normalización, embeddings en caché y escritura en Qdrant."""
+"""Orquesta el flujo de indexación de chunks hasta Qdrant.
+
+Carga la configuración, normaliza las entradas de chunks, genera o recupera
+sus embeddings desde la caché y crea o actualiza los puntos de la colección
+configurada. También ofrece una operación para normalizar sin cargar el modelo
+ni conectarse a Qdrant, y una función para generar el embedding de una consulta
+con el prefijo configurado para consultas.
+"""
 
 # ============================================================
 # IMPORTS
@@ -28,6 +35,18 @@ DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "indexing_config.json"
 
 
 def load_config(config_file: Path = DEFAULT_CONFIG) -> dict[str, Any]:
+    """Carga la configuración JSON de indexación.
+
+    Args:
+        config_file: Ruta del archivo de configuración.
+
+    Returns:
+        La configuración como un objeto JSON.
+
+    Raises:
+        ValueError: Si el contenido JSON no es un objeto.
+        OSError, json.JSONDecodeError: Si no se puede leer o decodificar el archivo.
+    """
     # Todas las fases leen el mismo archivo para mantener modelo y colección
     # consistentes entre la indexación y las consultas.
     with config_file.open("r", encoding="utf-8") as stream:
@@ -38,6 +57,10 @@ def load_config(config_file: Path = DEFAULT_CONFIG) -> dict[str, Any]:
 
 
 def _resolve(root: Path, value: str) -> Path:
+    """Resuelve una ruta de configuración relativa a la raíz del proyecto.
+
+    Las rutas absolutas se devuelven sin anteponer ``root``.
+    """
     # Las rutas relativas de configuración se interpretan desde la raíz
     # del proyecto, no desde el directorio actual del proceso.
     path = Path(value)
@@ -49,6 +72,23 @@ def _resolve(root: Path, value: str) -> Path:
 # ============================================================
 
 def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
+    """Ejecuta la normalización, generación de embeddings y escritura en Qdrant.
+
+    Valida la configuración y los IDs de chunks, reutiliza la caché de
+    embeddings cuando está habilitada y cierra el cliente Qdrant incluso si
+    falla la escritura. Los errores de E/S, del proveedor de embeddings y de
+    Qdrant se propagan desde la fase correspondiente.
+
+    Args:
+        config_file: Ruta del archivo de configuración; sus rutas relativas
+            se resuelven desde la raíz del proyecto.
+
+    Returns:
+        Número de puntos nuevos o modificados enviados a Qdrant.
+
+    Raises:
+        ValueError: Si la configuración o los chunks no cumplen los requisitos.
+    """
     root = config_file.resolve().parent.parent
     config = load_config(config_file)
     paths = config["paths"]
@@ -127,6 +167,16 @@ def run_indexing(config_file: Path = DEFAULT_CONFIG) -> int:
 # ============================================================
 
 def normalize_only(config_file: Path = DEFAULT_CONFIG) -> int:
+    """Normaliza los chunks y escribe el archivo JSONL configurado.
+
+    No carga el modelo de embeddings ni se conecta a Qdrant.
+
+    Args:
+        config_file: Ruta del archivo de configuración.
+
+    Returns:
+        Número de chunks escritos.
+    """
     # Permite inspeccionar los registros normalizados sin cargar el modelo
     # ni requerir una conexión activa a Qdrant.
     root = config_file.resolve().parent.parent
@@ -139,6 +189,19 @@ def normalize_only(config_file: Path = DEFAULT_CONFIG) -> int:
 
 
 def embed_query(text: str, embedder: Any, config: dict[str, Any]) -> list[float]:
+    """Genera el embedding de una consulta con el prefijo configurado.
+
+    ``embedder`` debe proporcionar ``embed_documents`` y usar el mismo modelo
+    y normalización que se emplean para los documentos.
+
+    Args:
+        text: Texto de la consulta.
+        embedder: Modelo de embeddings ya inicializado.
+        config: Configuración que puede incluir ``query_prefix``.
+
+    Returns:
+        El vector de la consulta.
+    """
     # Usar el mismo modelo y normalización que los documentos; query_prefix
     # permite adaptar los modelos que distinguen consultas de pasajes.
     prefix = config.get("query_prefix", "")

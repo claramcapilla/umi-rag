@@ -1,4 +1,10 @@
-"""Carga el modelo de embeddings y convierte textos en vectores por lotes."""
+"""Configura el modelo de embeddings y transforma textos en vectores por lotes.
+
+Usa Hugging Face Sentence Transformers, permite configurar la normalización de
+vectores y valida la configuración de workers CPU y dispositivos GPU. La
+generación puede ejecutarse en un solo proceso o mediante un pool
+multiproceso, y ofrece lotes para limitar el uso de memoria.
+"""
 
 # ============================================================
 # IMPORTS
@@ -22,6 +28,15 @@ def create_embedder(
     config: dict[str, Any],
     device_override: str | None = None,
 ) -> HuggingFaceEmbeddings:
+    """Crea el modelo Hugging Face configurado para generar embeddings.
+
+    La configuración requiere ``model_name`` y admite ``device``,
+    ``trust_remote_code`` y ``normalize_embeddings``. ``device_override``, si
+    se proporciona, tiene prioridad sobre ``device``.
+
+    Raises:
+        ValueError: Si ``model_name`` falta o está vacío.
+    """
     # Se exige configurar el modelo para evitar indexar accidentalmente con
     # uno distinto al que se usará después para representar las preguntas.
     model_name = config.get("model_name")
@@ -58,7 +73,18 @@ def create_embedder(
 def resolve_worker_config(
     config: dict[str, Any],
 ) -> tuple[int, int, list[int]]:
-    """Valida workers e GPUs y devuelve workers CPU, hilos y GPUs seleccionadas."""
+    """Valida la configuración de paralelismo y selecciona las GPUs.
+
+    Lee ``num_workers``, ``cpu_threads``, ``num_gpus`` y ``gpu_ids``. Si se
+    solicitan GPUs sin IDs explícitos, selecciona las primeras disponibles.
+
+    Returns:
+        Tupla ``(num_workers, cpu_threads, gpu_ids)`` validada.
+
+    Raises:
+        ValueError: Si los valores tienen tipos, rangos o combinaciones inválidos.
+        RuntimeError: Si se solicitan GPUs y CUDA no está disponible.
+    """
     num_workers = config.get("num_workers", 1)
     cpu_threads = config.get("cpu_threads", 1)
     num_gpus = config.get("num_gpus", 0)
@@ -107,7 +133,11 @@ def resolve_worker_config(
 # ============================================================
 
 def _get_sentence_transformer(embedder: HuggingFaceEmbeddings) -> Any:
-    """Obtiene el SentenceTransformer necesario para su pool multiproceso."""
+    """Obtiene el SentenceTransformer interno usado para crear el pool de workers.
+
+    Raises:
+        AttributeError: Si el embedder no expone el modelo interno esperado.
+    """
     model = getattr(embedder, "client", None)
     if model is None:
         model = getattr(embedder, "_client", None)
@@ -128,7 +158,21 @@ def iter_embedding_batches(
     cpu_threads: int,
     gpu_ids: list[int],
 ) -> Iterator[tuple[int, list[list[float]]]]:
-    """Genera lotes cacheables manteniendo un único pool durante la ejecución."""
+    """Genera embeddings en lotes y mantiene un único pool durante la iteración.
+
+    ``cache_batch_size`` controla el tamaño de cada grupo emitido y
+    ``embedding_batch_size`` el de cada llamada al modelo. Si se indican GPUs o
+    más de un worker, se usa un pool multiproceso; al finalizar se detiene el
+    pool y se restauran los límites de hilos y variables de entorno previos.
+
+    Yields:
+        Pares ``(índice_inicial, vectores)``; los índices corresponden a
+        ``texts``. Si ``texts`` está vacío, no produce elementos.
+
+    Raises:
+        ValueError: Si alguno de los tamaños de lote es menor que 1.
+        RuntimeError: Si el modelo devuelve un número inesperado de vectores.
+    """
     if not texts:
         return
     if embedding_batch_size < 1 or cache_batch_size < 1:
@@ -206,6 +250,21 @@ def embed_documents(
     prefix: str = "",
     batch_size: int = 32,
 ) -> list[list[float]]:
+    """Calcula embeddings de documentos aplicando un prefijo opcional por lote.
+
+    Args:
+        embedder: Modelo Hugging Face ya inicializado.
+        texts: Textos que se convertirán, en el orden de salida deseado.
+        prefix: Texto que se antepone a cada entrada.
+        batch_size: Máximo de textos por llamada al modelo; debe ser positivo.
+
+    Returns:
+        Un vector por cada texto, en el mismo orden.
+
+    Raises:
+        ValueError: Si ``batch_size`` es menor que 1.
+        RuntimeError: Si el modelo devuelve un número inesperado de vectores.
+    """
     # Los lotes limitan el uso de memoria GPU/CPU, sin abrir procesos workers.
     if batch_size < 1:
         raise ValueError("embedding_batch_size debe ser al menos 1.")

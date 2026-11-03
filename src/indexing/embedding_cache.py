@@ -1,4 +1,11 @@
-"""Caché JSONL de vectores para evitar recalcular chunks sin cambios."""
+"""Almacena y reutiliza embeddings de chunks en una caché JSONL.
+
+La caché se separa por modelo y valida cada entrada mediante el hash del texto
+con su prefijo y el ``chunk_id``. Solo calcula los vectores ausentes o
+desactualizados, conserva el orden original de los chunks y guarda los
+resultados por lotes para que las entradas completas sobrevivan a una
+interrupción del proceso.
+"""
 
 # ============================================================
 # IMPORTS
@@ -20,18 +27,26 @@ from indexing.embedder import iter_embedding_batches
 # ============================================================
 
 def _text_hash(text: str) -> str:
+    """Devuelve el SHA-256 hexadecimal del texto usado para calcular el vector."""
     # El hash permite invalidar la caché si cambia el texto o su prefijo,
     # incluso aunque se conserve el mismo chunk_id.
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _cache_path(cache_dir: Path, model_name: str) -> Path:
+    """Construye la ruta JSONL de caché correspondiente al modelo."""
     # El modelo forma parte de la ruta para no mezclar espacios vectoriales.
     safe_name = re.sub(r"[^a-zA-Z0-9]+", "_", model_name).strip("_")
     return cache_dir / f"{safe_name}.jsonl"
 
 
 def load_cache(cache_dir: Path, model_name: str) -> dict[str, dict[str, Any]]:
+    """Carga las entradas de caché del modelo, si existe el archivo.
+
+    Si la última línea está incompleta por una interrupción, trunca esa línea
+    y conserva las entradas completas. Los registros completos mal formados
+    producen una excepción de decodificación o de clave.
+    """
     path = _cache_path(cache_dir, model_name)
     if not path.exists():
         return {}
@@ -70,6 +85,11 @@ def save_cache_entries(
     model_name: str,
     entries: list[tuple[str, str, list[float]]],
 ) -> None:
+    """Añade entradas de embeddings al archivo JSONL del modelo.
+
+    Cada tupla contiene el ID del chunk, el hash del texto prefijado y su
+    vector. Si no hay entradas, no crea ni modifica el archivo.
+    """
     # Se añade un registro por vector para que las entradas ya guardadas
     # sobrevivan a una interrupción del proceso.
     if not entries:
@@ -104,6 +124,18 @@ def embed_chunks_with_cache(
     gpu_ids: list[int] | None = None,
     embedding_batch_size: int | None = None,
 ) -> list[list[float]]:
+    """Genera embeddings para chunks y reutiliza los vectores válidos de caché.
+
+    La caché se identifica por modelo y ``chunk_id``; el hash incluye el texto
+    con ``prefix``. Los resultados se devuelven en el mismo orden que
+    ``chunks``. Con ``use_cache=False`` no se leen ni se guardan entradas.
+    ``batch_size`` determina el lote de caché, mientras que
+    ``embedding_batch_size`` limita el lote enviado al modelo y, si no se
+    especifica, usa el tamaño de caché.
+
+    Cada chunk debe incluir ``chunk_id`` y ``text``. Si los embeddings
+    generados no corresponden en cantidad con los chunks, lanza ``RuntimeError``.
+    """
     # Mantener el orden original de chunks: Qdrant recibirá cada vector junto
     # al payload del chunk correspondiente.
     cache = load_cache(cache_dir, model_name) if use_cache else {}

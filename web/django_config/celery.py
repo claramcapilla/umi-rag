@@ -4,9 +4,9 @@ import os
 
 from celery import Celery
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "chatbot.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "django_config.settings")
 
-app = Celery("chatbot")
+app = Celery("django_config")
 
 # Leer configuración CELERY_* desde settings.py.
 app.config_from_object("django.conf:settings", namespace="CELERY")

@@ -31,15 +31,20 @@ Desde la raíz del repositorio, en PowerShell:
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[indexing,chunking]"
+python -m pip install -e ".[indexing,chunking,web,dev]"
 ```
 
 La instalación editable registra los paquetes que están en `src/` para que
-puedan importarse directamente como `indexing`, `retrieval`, etc. El extra
-`indexing` instala las dependencias de embeddings y Qdrant (incluidos `numpy`
-y `qdrant-client`); `chunking` instala las dependencias de la estrategia JSON.
-Ambos extras se incluyen para ejecutar el pipeline y los tests. PyTorch puede
-requerir una instalación específica según el hardware y la versión de CUDA.
+puedan importarse directamente como `indexing`, `retrieval`, etc. Los extras
+`indexing`, `chunking`, `web` y `dev` instalan, respectivamente, las
+dependencias de embeddings y Qdrant, del procesamiento JSON, de la aplicación
+Django y de las pruebas. PyTorch puede requerir una instalación específica
+según el hardware y la versión de CUDA. Para instalar solo la aplicación web y
+sus dependencias de procesamiento:
+
+```powershell
+python -m pip install -e ".[indexing,chunking,web]"
+```
 
 `pyproject.toml` es el archivo estándar de configuración y metadatos de un
 proyecto Python: aquí declara el nombre, la versión, las dependencias, la
@@ -111,7 +116,7 @@ La aplicación web lo utiliza en el chat.
 Instala las dependencias de la aplicación y sus extras desde la raíz:
 
 ```powershell
-python -m pip install -r web\requirements.txt
+python -m pip install -e ".[indexing,chunking,web]"
 ```
 
 Configura `DJANGO_SECRET_KEY` (obligatoria) y, si no se usan los valores por

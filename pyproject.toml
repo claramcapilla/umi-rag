@@ -16,6 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=8,<10",
+    "pytest-django>=4.8,<5",
+]
 indexing = [
     "numpy",
     "qdrant-client",
@@ -32,6 +36,8 @@ chunking = [
 web = [
     "celery[redis]>=5.4,<6",
     "django-simple-history>=3.7,<4",
+    "gunicorn>=22",
+    "mistune>=3,<4",
     "whitenoise>=6.6,<7",
 ]
 

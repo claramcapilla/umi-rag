@@ -33,8 +33,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "chatbot.urls"
-WSGI_APPLICATION = "chatbot.wsgi.application"
+ROOT_URLCONF = "django_config.urls"
+WSGI_APPLICATION = "django_config.wsgi.application"
 
 TEMPLATES = [
     {

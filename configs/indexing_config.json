@@ -7,7 +7,7 @@
   "qdrant": {
     "host": "127.0.0.1",
     "port": 6333,
-    "collection_name": "umi_e5_test"
+    "collection_name": "docsrepo_e5_test"
   },
   "embeddings": {
     "model_name": "intfloat/multilingual-e5-small",

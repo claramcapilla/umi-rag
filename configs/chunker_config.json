@@ -4,7 +4,7 @@
         "output_dir": "data/processed/chunks"
     },
     "execution": {
-        "workers": 1
+        "workers": 4
     },
     "tokenizer": {
         "model_name": "intfloat/multilingual-e5-small",

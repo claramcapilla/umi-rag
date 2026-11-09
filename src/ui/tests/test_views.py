@@ -587,7 +587,7 @@ def test_index_view_enqueues_task(client: Client, monkeypatch: pytest.MonkeyPatc
 def test_index_view_rejects_partial_extraction(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """El control que impide meter en el ChromaDB compartido lo que `tasks.py` rechazó.
+    """El control que impide meter en el Qdrant compartido lo que `tasks.py` rechazó.
 
     La plantilla ya no ofrece el botón, pero un POST directo llega igual a la vista, y la guarda
     de `index_document` corre en el worker: sin esta, el rechazo dependía de que nadie mandara el

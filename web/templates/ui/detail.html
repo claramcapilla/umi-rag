@@ -316,9 +316,9 @@
     {% if doc.json_file and not doc.extraccion_parcial %}
     <form method="post" action="{% url 'ui:index' doc.pk %}" style="margin-top:8px">
       {% csrf_token %}
-      <button type="submit">{% if doc.status == "INDEXED" %}Reindexar{% else %}Indexar{% endif %} (JSON → ChromaDB)</button>
+      <button type="submit">{% if doc.status == "INDEXED" %}Reindexar{% else %}Indexar{% endif %} (JSON → Qdrant)</button>
     </form>
-    <p class="muted" style="font-size:12px">Requiere servidor ChromaDB + backend de embeddings. El documento debe estar en una especialidad.</p>
+    <p class="muted" style="font-size:12px">Requiere servidor Qdrant + backend de embeddings. El documento debe estar en una especialidad.</p>
     {% elif doc.extraccion_parcial %}
     <p class="muted" style="font-size:12px; margin-top:8px">
       No se puede indexar: el JSON está incompleto o no pasó la revisión de contenido. El motivo

@@ -7,7 +7,7 @@
   "qdrant": {
     "host": "127.0.0.1",
     "port": 6333,
-    "collection_name": "umi_rag_test"
+    "collection_name": "umi_e5_test"
   },
   "embeddings": {
     "model_name": "intfloat/multilingual-e5-small",
@@ -19,10 +19,10 @@
   },
   "indexing": {
     "batch_size": 32,
-    "embedding_batch_size": 32,
+    "embedding_batch_size": 16,
     "cache_batch_size": 1024,
     "num_workers": 1,
-    "cpu_threads": 1,
+    "cpu_threads": 4,
     "num_gpus": 0,
     "gpu_ids": [],
     "use_cache": true
